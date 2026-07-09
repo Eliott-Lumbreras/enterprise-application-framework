@@ -2,19 +2,37 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 9 — Code Reviewer automático
+## Estado actual: Fase 10 completa — las 10 fases planeadas están hechas
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
 - [x] Fase 2 — 15 skills en `.claude/skills/`: architecture, backend, frontend, database, security, logging, testing, docker, electron, powerbi, sql, mining, deployment, installer, documentation
-- [x] Fase 3 — 12 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page
+- [x] Fase 3 — 13 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page, design doc
 - [x] Fase 4 — 5 prompts en `.claude/prompts/`: create-module, create-report, create-dashboard, create-api, create-auth
 - [x] Fase 5 — 4 workflows en `.claude/workflows/`: new-project, new-module, new-reporting-feature, release
 - [x] Fase 6 — 10 checklists + gate maestro en `.claude/checklists/`: seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos
 - [x] Fase 7 — Knowledge base en `.claude/knowledge-base/`: glosario, entidades confirmadas/pendientes, KPIs, turnos, fuentes de datos
-- [x] Fase 8 — Generadores de módulos: `scripts/generate-module.js` (Entity, DTO, Repository, Service, Controller, Migration, Unit test, Integration test, página Frontend a partir de un solo nombre de entidad)
-- [x] Fase 9 — Code Reviewer automático: `scripts/review-module.js` (11 reglas de archivo + 4 de módulo, mapeadas a los 10 checklists de la Fase 6)
-- [ ] Fase 10 — AI Architect (checklist de diseño antes de generar código)
+- [x] Fase 8 — Generadores de módulos: `scripts/generate-module.js`
+- [x] Fase 9 — Code Reviewer automático: `scripts/review-module.js`
+- [x] Fase 10 — AI Architect: `.claude/skills/ai-architect.md` + `design.checklist.md` + `scripts/check-design.js`, gate de diseño antes de generar código
+
+## Pipeline completo, de punta a punta
+
+```
+check-design.js  ->  generate-module.js  ->  review-module.js  ->  module.checklist.md
+  (Fase 10)            (Fase 8)              (Fase 9)              (Fase 6, humano)
+  gate de diseño        genera código          revisa código          gate de entrega
+```
+
+## AI Architect (Fase 10)
+
+Gate de diseño que corre ANTES de generar código. `.claude/skills/ai-architect.md` define el rol; `.claude/templates/design-doc.template.md` es la plantilla a llenar (7 secciones: Entidad y campos, Reglas de negocio, Roles y permisos, Requisitos no funcionales, Fuente de datos, Clasificación de datos y compliance, Fuera de alcance); `scripts/check-design.js` verifica que se haya llenado de verdad y no dejado igual a la plantilla:
+
+```bash
+node scripts/check-design.js equipment
+```
+
+Regla explícita heredada del resto del framework: lo que no está confirmado se marca "Pendiente de confirmar", nunca se inventa. Probado con un doc sin llenar (falla las 7 secciones), uno completo (pasa) y uno con 6/7 llenas (falla solo la pendiente). Detalle en `scripts/README.md`.
 
 ## Skills (Fase 2)
 
@@ -35,6 +53,7 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+| ai-architect.md | AI Software Architect (gate de diseño previo a generar código, Fase 10) |
 
 ## Code Reviewer automático (Fase 9)
 
@@ -84,10 +103,11 @@ Cada archivo generado se vuelve a leer del disco para confirmar que no quedó tr
 
 Regla estricta de esta carpeta: nada marcado "pendiente" se trata como dato real hasta confirmarlo. Ver `.claude/knowledge-base/README.md`.
 
-## Checklists de calidad (Fase 6)
+## Checklists de calidad (Fase 6 + Fase 10)
 
 | Checklist | Cubre |
 |---|---|
+| design.checklist.md | Diseño confirmado antes de generar código (Fase 10, gate de entrada) |
 | security.checklist.md | OWASP Top 10, secretos, Argon2, JWT, autorización |
 | testing.checklist.md | Unit + integration, cobertura, casos borde |
 | swagger.checklist.md | Documentación OpenAPI de cada endpoint |
@@ -99,14 +119,14 @@ Regla estricta de esta carpeta: nada marcado "pendiente" se trata como dato real
 | roles.checklist.md | Roles como datos, menor privilegio, auditoría de cambios |
 | permissions.checklist.md | Permisos granulares, verificación real en backend |
 
-`module.checklist.md` es el gate consolidado: ningún módulo se marca terminado si falla alguno de los 10.
+`module.checklist.md` es el gate consolidado de salida: ningún módulo se marca terminado si falla alguno de los 10 (más `design.checklist.md` como gate previo de entrada).
 
 ## Workflows (Fase 5)
 
 | Workflow | Cuando se usa |
 |---|---|
 | new-project.md | Proyecto -> BD -> Backend -> Frontend -> Electron -> Docker -> Tests -> Instalador |
-| new-module.md | Agregar un modulo CRUD a un proyecto existente |
+| new-module.md | Agregar un modulo CRUD a un proyecto existente (incluye el gate de diseño de Fase 10 como paso 0) |
 | new-reporting-feature.md | Reporte + dashboard de punta a punta |
 | release.md | Pasar de homologacion a produccion con rollback documentado |
 
@@ -140,6 +160,7 @@ Cada prompt referencia los skills (Fase 2) y plantillas (Fase 3) correspondiente
 | Dockerfile.template | Build multi-stage, usuario no root, HEALTHCHECK |
 | electron.main.template.ts / electron.preload.template.ts | Proceso principal + preload con contextIsolation |
 | react-page.template.tsx | Página con loading/empty/error states y confirmación de borrado |
+| design-doc.template.md | Design doc de pre-generación (Fase 10) |
 
 Convención de stack y placeholders documentada en `.claude/templates/README.md`.
 
@@ -162,6 +183,7 @@ Enterprise-App-Framework/
 ├── mobile/
 ├── database/
 ├── docs/
+│   └── design/          (design docs por módulo, Fase 10)
 ├── infrastructure/
 ├── scripts/
 ├── tests/

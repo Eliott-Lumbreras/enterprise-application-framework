@@ -1,9 +1,13 @@
-# Checklists de calidad (Fase 6)
+# Checklists de calidad (Fase 6 + Fase 10)
 
-Gate de verificacion antes de dar por terminado cualquier modulo (ver `.claude/workflows/new-module.md` y `new-project.md`, paso final antes de entregar). Ningun modulo se marca como completo si falla alguno de estos 10 checklists.
+Dos gates distintos, no uno solo:
+
+- **Entrada (Fase 10, antes de generar codigo)**: `design.checklist.md`. Se revisa antes de correr `generate-module.js`.
+- **Salida (Fase 6, antes de entregar)**: los 10 checklists de abajo, consolidados en `module.checklist.md`. Ningun modulo se marca como completo si falla alguno.
 
 | Checklist | Cubre |
 |---|---|
+| design.checklist.md | Diseno confirmado antes de generar codigo (Fase 10, gate de entrada) |
 | security.checklist.md | OWASP Top 10, secretos, Argon2, JWT, autorizacion |
 | testing.checklist.md | Unit + integration, cobertura, casos borde |
 | swagger.checklist.md | Documentacion OpenAPI de cada endpoint |
@@ -15,4 +19,4 @@ Gate de verificacion antes de dar por terminado cualquier modulo (ver `.claude/w
 | roles.checklist.md | Roles como datos, menor privilegio, auditoria de cambios |
 | permissions.checklist.md | Permisos granulares, verificacion real en backend |
 
-Ver `module.checklist.md` para el gate consolidado.
+Ver `module.checklist.md` para el gate consolidado de salida.

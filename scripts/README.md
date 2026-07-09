@@ -1,4 +1,61 @@
-# Generadores y revisión automática (Fases 8-9)
+# Generadores, revisión y gate de diseño (Fases 8-10)
+
+## check-design.js (Fase 10) — AI Architect / gate de diseño
+
+Se corre ANTES que todo lo demás en esta carpeta: valida que el design doc
+de un módulo (`.claude/templates/design-doc.template.md` llenado, normalmente
+en `docs/design/<kebab>.design.md`) tenga sus 7 secciones obligatorias
+respondidas de verdad, no dejadas igual que la plantilla.
+
+### Uso
+
+```bash
+node scripts/check-design.js <NombreModuloKebabCase> [--root=<ruta>]
+node scripts/check-design.js --file=<ruta-al-design-doc> [--template=<ruta>]
+```
+
+Ejemplos:
+
+```bash
+node scripts/check-design.js equipment
+node scripts/check-design.js --file=docs/design/equipment.design.md
+```
+
+Código de salida: `1` si alguna sección obligatoria falta o quedó idéntica a
+la plantilla; `0` si las 7 fueron modificadas.
+
+### Cómo detecta "no llenado"
+
+Compara, sección por sección, el cuerpo del documento del usuario contra el
+cuerpo de la misma sección en la plantilla canónica
+(`.claude/templates/design-doc.template.md`), ignorando espacios. Si son
+iguales, la sección no se tocó. Se eligió esta comparación en vez de una
+heurística de longitud de texto porque el placeholder de la plantilla va
+acompañado de texto instructivo largo — una regla de "muy corto = vacío"
+daba falsos negativos.
+
+### Las 7 secciones obligatorias
+
+Entidad y campos, Reglas de negocio, Roles y permisos, Requisitos no
+funcionales, Fuente de datos, Clasificación de datos y compliance, Fuera de
+alcance. Ver `.claude/checklists/design.checklist.md` para el detalle de qué
+debe contener cada una y `.claude/skills/ai-architect.md` para el rol que
+las completa.
+
+### Qué NO verifica
+
+Que las respuestas sean correctas — solo que existen y son propias del
+usuario. La correctitud sigue siendo criterio del AI Architect / de quien
+revisa. Tampoco reemplaza `review-module.js` (Fase 9, revisa código ya
+generado) ni `module.checklist.md` (Fase 6, gate de salida).
+
+### Verificado con casos de prueba
+
+Se probó con un design doc recién copiado de la plantilla sin llenar (falla
+las 7 secciones), uno completamente llenado con respuestas reales incluyendo
+un "Pendiente de confirmar" explícito en Fuente de datos (pasa limpio), y uno
+con 6 secciones llenas y 1 revertida a placeholder (falla solo esa,
+identificándola por nombre).
 
 ## generate-module.js (Fase 8)
 
@@ -59,12 +116,13 @@ entrada; el script deriva las 4 variantes y el plural para todos los archivos.
 - Despues de escribir cada archivo, lo vuelve a leer del disco y compara contra el contenido esperado (detecta truncamientos de escritura).
 - Falla si queda algun `{{placeholder}}` sin resolver en el archivo final.
 
-### Despues de generar
+### Antes y después de generar
 
-1. Ajustar los campos de dominio: la Entity/DTO/Migration generados traen solo `name` y `status` como campos de ejemplo — reemplazar por los campos reales del modulo.
+0. Antes: pasar `check-design.js` (Fase 10) para el mismo módulo.
+1. Ajustar los campos de dominio: la Entity/DTO/Migration generados traen solo `name` y `status` como campos de ejemplo — reemplazar por los campos reales confirmados en el design doc.
 2. Registrar el modulo (imports/providers en el modulo de Nest, ruta en el router del frontend).
-3. Pasar `module.checklist.md` (Fase 6) antes de marcar el modulo como terminado.
-4. Correr `review-module.js` (ver abajo) antes de ese checklist final.
+3. Correr `review-module.js` (ver abajo).
+4. Pasar `module.checklist.md` (Fase 6) antes de marcar el modulo como terminado.
 
 ## review-module.js (Fase 9) — Code Reviewer automatico
 
@@ -140,3 +198,10 @@ hardcodeado, un `console.error`, un catch vacio, concatenacion SQL insegura, un
 DTO sin decoradores, un controller sin `@UseGuards`, una columna de auditoria
 faltante y un test eliminado: el reviewer detecto los 9 casos correctamente y
 devolvio exit code 1.
+
+## Orden completo, de punta a punta
+
+```
+check-design.js  ->  generate-module.js  ->  review-module.js  ->  module.checklist.md
+  (Fase 10)            (Fase 8)              (Fase 9)              (Fase 6, humano)
+```

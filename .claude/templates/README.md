@@ -26,5 +26,6 @@ Convención de stack: Node.js + TypeScript Strict + NestJS-style (decoradores, D
 - `Dockerfile.template` — build multi-stage, usuario no root, HEALTHCHECK.
 - `electron.main.template.ts` / `electron.preload.template.ts` — proceso principal y preload con contextIsolation.
 - `react-page.template.tsx` — página React con loading/empty/error states y Dark Mode.
+- `design-doc.template.md` — design doc de pre-generación (Fase 10): entidad y campos, reglas de negocio, roles/permisos, requisitos no funcionales, fuente de datos, clasificación de compliance, fuera de alcance. Se llena ANTES de generar código, no después.
 
 Cada plantilla es un punto de partida completo (sin TODOs), no un esqueleto vacío. Se adapta reemplazando los placeholders, nunca copiando código incompleto.
