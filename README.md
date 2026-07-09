@@ -2,7 +2,7 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 6 — Checklists de calidad
+## Estado actual: Fase 7 — Knowledge base Fast2Mine
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
@@ -11,7 +11,7 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 - [x] Fase 4 — 5 prompts en `.claude/prompts/`: create-module, create-report, create-dashboard, create-api, create-auth
 - [x] Fase 5 — 4 workflows en `.claude/workflows/`: new-project, new-module, new-reporting-feature, release
 - [x] Fase 6 — 10 checklists + gate maestro en `.claude/checklists/`: seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos
-- [ ] Fase 7 — Knowledge base específico de Fast2Mine (equipos, operadores, frentes, producción, KPIs, turnos, etc.)
+- [x] Fase 7 — Knowledge base en `.claude/knowledge-base/`: glosario, entidades confirmadas/pendientes, KPIs, turnos, fuentes de datos
 - [ ] Fase 8 — Generadores de módulos
 - [ ] Fase 9 — Code Reviewer automático
 - [ ] Fase 10 — AI Architect (checklist de diseño antes de generar código)
@@ -35,6 +35,18 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Knowledge base Fast2Mine (Fase 7)
+
+| Archivo | Contenido |
+|---|---|
+| glossary.md | Terminología minera, distinguiendo confirmado vs pendiente |
+| entities.md | Reportes/entidades: Acarreo confirmado, 6 endpoints pendientes de mapeo |
+| kpis.md | Catálogo de KPIs mineros estándar y sus fórmulas |
+| shift-structure.md | Estructura de turno y lógica de períodos (Día/Semana/Mes) |
+| data-sources.md | Contrato confirmado de la API de MiningControl |
+
+Regla estricta de esta carpeta: nada marcado "pendiente" se trata como dato real hasta confirmarlo. Ver `.claude/knowledge-base/README.md`.
 
 ## Checklists de calidad (Fase 6)
 
@@ -106,7 +118,8 @@ Enterprise-App-Framework/
 │   ├── templates/
 │   ├── prompts/
 │   ├── workflows/
-│   └── checklists/
+│   ├── checklists/
+│   └── knowledge-base/
 ├── backend/
 ├── frontend/
 ├── desktop/
