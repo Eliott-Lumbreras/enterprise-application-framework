@@ -1,6 +1,6 @@
-# Generadores (Fase 8)
+# Generadores y revisión automática (Fases 8-9)
 
-## generate-module.js
+## generate-module.js (Fase 8)
 
 Genera un modulo backend/frontend completo a partir de una sola entidad,
 reutilizando las plantillas de `.claude/templates/` (Fase 3) y su convencion
@@ -64,3 +64,79 @@ entrada; el script deriva las 4 variantes y el plural para todos los archivos.
 1. Ajustar los campos de dominio: la Entity/DTO/Migration generados traen solo `name` y `status` como campos de ejemplo — reemplazar por los campos reales del modulo.
 2. Registrar el modulo (imports/providers en el modulo de Nest, ruta en el router del frontend).
 3. Pasar `module.checklist.md` (Fase 6) antes de marcar el modulo como terminado.
+4. Correr `review-module.js` (ver abajo) antes de ese checklist final.
+
+## review-module.js (Fase 9) — Code Reviewer automatico
+
+Revisa codigo (tipicamente el que acaba de salir de `generate-module.js`, o
+cualquier `.ts`/`.tsx` del proyecto) contra reglas deterministas derivadas de
+`.claude/CLAUDE.md` y los 10 checklists de `.claude/checklists/`.
+
+**Importante — que es y que no es**: automatiza solo la parte de cada
+checklist que se puede verificar por texto (regex/estructura). No reemplaza
+`module.checklist.md`: criterios como "rate limiting configurado", "revision
+OWASP completa" o "N+1 reales bajo carga" requieren criterio humano y el
+script no finge verificarlos.
+
+### Uso
+
+```bash
+# Revisar un modulo generado por generate-module.js (busca en backend/, tests/,
+# database/migrations/ y frontend/ usando el nombre en kebab-case)
+node scripts/review-module.js <nombre-modulo-kebab> [--root=<ruta>]
+
+# Revisar un archivo o carpeta arbitraria (sin las reglas de "modulo completo"
+# como existencia de tests/migracion)
+node scripts/review-module.js --path=<archivo-o-carpeta> [--root=<ruta>]
+```
+
+Ejemplos:
+
+```bash
+node scripts/review-module.js equipment
+node scripts/review-module.js --path=backend/src/modules/equipment/equipment.service.ts
+```
+
+Codigo de salida: `1` si hay al menos un hallazgo BLOQUEANTE (util para engancharlo
+a CI); `0` si solo hay advertencias/informativos o todo paso.
+
+### Reglas a nivel de archivo (aplican segun el tipo de archivo)
+
+| Regla | Checklist | Severidad |
+|---|---|---|
+| `core.no-todo` | CLAUDE.md — nunca dejar TODOs | Bloqueante |
+| `security.no-hardcoded-secrets` | security.checklist.md | Bloqueante |
+| `security.no-sql-concat` | security.checklist.md | Bloqueante |
+| `error-handling.no-empty-catch` | error-handling.checklist.md | Bloqueante |
+| `validation.dto-has-decorators` (solo `*.dto.ts`) | validation.checklist.md | Bloqueante |
+| `roles.controller-has-guard` (solo `*.controller.ts`) | roles.checklist.md / permissions.checklist.md | Bloqueante |
+| `swagger.operation-balance` (solo `*.controller.ts`) | swagger.checklist.md | Bloqueante |
+| `audit.entity-columns` (solo `*.entity.ts`) | audit.checklist.md | Bloqueante |
+| `audit.migration-columns` (solo migraciones) | audit.checklist.md | Bloqueante |
+| `logging.no-console` (solo `backend/src` y `frontend/src`) | logging.checklist.md | Advertencia |
+| `performance.list-pagination` (solo `*.repository.ts`) | performance.checklist.md | Advertencia |
+
+### Reglas a nivel de modulo (solo en modo `<nombre-modulo>`, no en `--path`)
+
+| Regla | Checklist | Severidad |
+|---|---|---|
+| `testing.unit-test-exists` | testing.checklist.md | Bloqueante |
+| `testing.integration-test-exists` | testing.checklist.md | Bloqueante |
+| `database.migration-exists` | CLAUDE.md (Database: migraciones siempre) | Bloqueante |
+| `frontend.page-exists` | informativo — no todo modulo necesita UI | Informativo |
+
+### Que NO cubre (para no fabricar falsa confianza)
+
+- No detecta N+1 reales (requiere observar consultas en ejecucion, no texto estatico).
+- No verifica rate limiting, revision OWASP completa, ni vulnerabilidades de dependencias.
+- No mide cobertura de tests real (`>90%"` de `testing.checklist.md`) — solo confirma que los archivos de test existen.
+- No verifica que Swagger (`/docs`) realmente levante sin errores en runtime.
+
+### Verificado con casos de prueba
+
+Se probo generando un modulo limpio (`generate-module.js Equipment`) — el reviewer
+no reporta hallazgos — y luego inyectando a proposito un TODO, un secreto
+hardcodeado, un `console.error`, un catch vacio, concatenacion SQL insegura, un
+DTO sin decoradores, un controller sin `@UseGuards`, una columna de auditoria
+faltante y un test eliminado: el reviewer detecto los 9 casos correctamente y
+devolvio exit code 1.

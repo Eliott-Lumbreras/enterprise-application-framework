@@ -2,7 +2,7 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 8 — Generadores de módulos
+## Estado actual: Fase 9 — Code Reviewer automático
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
@@ -13,7 +13,7 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 - [x] Fase 6 — 10 checklists + gate maestro en `.claude/checklists/`: seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos
 - [x] Fase 7 — Knowledge base en `.claude/knowledge-base/`: glosario, entidades confirmadas/pendientes, KPIs, turnos, fuentes de datos
 - [x] Fase 8 — Generadores de módulos: `scripts/generate-module.js` (Entity, DTO, Repository, Service, Controller, Migration, Unit test, Integration test, página Frontend a partir de un solo nombre de entidad)
-- [ ] Fase 9 — Code Reviewer automático
+- [x] Fase 9 — Code Reviewer automático: `scripts/review-module.js` (11 reglas de archivo + 4 de módulo, mapeadas a los 10 checklists de la Fase 6)
 - [ ] Fase 10 — AI Architect (checklist de diseño antes de generar código)
 
 ## Skills (Fase 2)
@@ -35,6 +35,24 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Code Reviewer automático (Fase 9)
+
+`scripts/review-module.js` escanea código generado (o cualquier `.ts`/`.tsx`) y aplica reglas deterministas mapeadas a los 10 checklists de la Fase 6:
+
+```bash
+node scripts/review-module.js equipment
+node scripts/review-module.js --path=backend/src/modules/equipment/equipment.service.ts
+```
+
+| Detecta (bloqueante) | Detecta (advertencia) | No cubre (requiere criterio humano) |
+|---|---|---|
+| TODOs, secretos hardcodeados, SQL concatenado, catch vacíos | `console.*` en vez de Logger | N+1 reales bajo carga |
+| DTO sin decoradores de validación | Listados sin paginación detectada | Rate limiting, revisión OWASP completa |
+| Controller sin `@UseGuards`, endpoints sin `@ApiOperation` | — | Cobertura de tests real (>90%) |
+| Entity/Migration sin columnas de auditoría, tests faltantes | — | Que `/docs` levante sin errores en runtime |
+
+Exit code 1 si hay algún hallazgo bloqueante (sirve para CI). No reemplaza `module.checklist.md`: ese sigue siendo el gate humano final. Probado generando un módulo limpio (sin hallazgos) e inyectando 9 violaciones a propósito (las 9 detectadas correctamente). Detalle completo en `scripts/README.md`.
 
 ## Generadores (Fase 8)
 

@@ -4,7 +4,8 @@
   "private": true,
   "description": "EAF - framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, movil, APIs) con estandares consistentes de arquitectura, seguridad y calidad.",
   "scripts": {
-    "generate:module": "node scripts/generate-module.js"
+    "generate:module": "node scripts/generate-module.js",
+    "review:module": "node scripts/review-module.js"
   },
   "engines": {
     "node": ">=18"
