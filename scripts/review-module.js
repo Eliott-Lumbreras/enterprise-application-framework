@@ -28,6 +28,14 @@ const path = require('path');
 const SEVERITY = { BLOCK: 'BLOQUEANTE', WARN: 'ADVERTENCIA', INFO: 'INFORMATIVO' };
 
 function parseArgs(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(
+      'Uso:\n' +
+      '  node scripts/review-module.js <NombreModuloKebabCase> [--root=<ruta>]\n' +
+      '  node scripts/review-module.js --path=<archivo-o-carpeta> [--root=<ruta>]\n',
+    );
+    process.exit(0);
+  }
   const positional = [];
   const options = {};
   for (const arg of argv) {
@@ -96,7 +104,15 @@ const FILE_RULES = [
     id: 'security.no-hardcoded-secrets',
     checklist: 'security.checklist.md ("Ningun secreto... hardcodeado")',
     severity: SEVERITY.BLOCK,
-    appliesTo: () => true,
+    // Se excluyen archivos de test (*.spec.ts / *.e2e-spec.ts): es practica
+    // estandar y aceptada tener tokens/credenciales FALSAS ahi para montar
+    // dobles de prueba (ej. el propio integration-test.template.spec.ts de
+    // este framework usa `authToken = 'test-jwt-token'` a proposito). Un
+    // secreto real jamas deberia estar en un test contra un sistema real,
+    // pero eso lo cubre el criterio humano de security.checklist.md, no este
+    // regex — de lo contrario todo modulo generado fallaria por su propio
+    // test de integracion.
+    appliesTo: (filePath) => !/\.(spec|e2e-spec)\.tsx?$/.test(filePath),
     check(content) {
       const findings = [];
       const assign = /(password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|token)\s*[:=]\s*['"][^'"]{3,}['"]/gi;

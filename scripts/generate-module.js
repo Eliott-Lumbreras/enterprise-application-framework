@@ -51,6 +51,13 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(
+      'Uso: node scripts/generate-module.js <NombreEntidad> [--plural=<kebab>] [--root=<ruta>] [--skip=parte1,parte2]\n' +
+      'Ejemplo: node scripts/generate-module.js Equipment\n',
+    );
+    process.exit(0);
+  }
   const positional = [];
   const options = { skip: [] };
   for (const arg of argv) {

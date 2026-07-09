@@ -38,6 +38,14 @@ const REQUIRED_SECTIONS = [
 ];
 
 function parseArgs(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(
+      'Uso:\n' +
+      '  node scripts/check-design.js <NombreModuloKebabCase> [--root=<ruta>]\n' +
+      '  node scripts/check-design.js --file=<ruta-al-design-doc> [--template=<ruta>]\n',
+    );
+    process.exit(0);
+  }
   const positional = [];
   const options = {};
   for (const arg of argv) {

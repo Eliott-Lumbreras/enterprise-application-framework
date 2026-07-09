@@ -163,7 +163,7 @@ a CI); `0` si solo hay advertencias/informativos o todo paso.
 | Regla | Checklist | Severidad |
 |---|---|---|
 | `core.no-todo` | CLAUDE.md — nunca dejar TODOs | Bloqueante |
-| `security.no-hardcoded-secrets` | security.checklist.md | Bloqueante |
+| `security.no-hardcoded-secrets` (no aplica a `*.spec.ts`/`*.e2e-spec.ts`) | security.checklist.md | Bloqueante |
 | `security.no-sql-concat` | security.checklist.md | Bloqueante |
 | `error-handling.no-empty-catch` | error-handling.checklist.md | Bloqueante |
 | `validation.dto-has-decorators` (solo `*.dto.ts`) | validation.checklist.md | Bloqueante |
@@ -189,6 +189,7 @@ a CI); `0` si solo hay advertencias/informativos o todo paso.
 - No verifica rate limiting, revision OWASP completa, ni vulnerabilidades de dependencias.
 - No mide cobertura de tests real (`>90%"` de `testing.checklist.md`) — solo confirma que los archivos de test existen.
 - No verifica que Swagger (`/docs`) realmente levante sin errores en runtime.
+- `security.no-hardcoded-secrets` no revisa archivos `*.spec.ts`/`*.e2e-spec.ts`: montar un token/credencial FALSA para un doble de prueba es practica estandar (el propio `integration-test.template.spec.ts` usa `authToken = 'test-jwt-token'`). Un secreto real jamas deberia estar en un test contra un sistema real, pero eso queda en manos del criterio humano de `security.checklist.md`.
 
 ### Verificado con casos de prueba
 
@@ -198,6 +199,15 @@ hardcodeado, un `console.error`, un catch vacio, concatenacion SQL insegura, un
 DTO sin decoradores, un controller sin `@UseGuards`, una columna de auditoria
 faltante y un test eliminado: el reviewer detecto los 9 casos correctamente y
 devolvio exit code 1.
+
+Auditoria de punta a punta (Fase 10 -> 8 -> 9 encadenadas sobre un modulo
+`WorkOrder` generado de cero): encontro un falso positivo real — el propio
+`integration-test.template.spec.ts` del framework (`authToken =
+'test-jwt-token'`) disparaba `security.no-hardcoded-secrets`, lo que habria
+bloqueado a TODO modulo generado por su propio test de integracion. Corregido
+excluyendo `*.spec.ts`/`*.e2e-spec.ts` de esa regla especifica (ver tabla de
+arriba). Re-verificado que un secreto real fuera de un archivo de test se
+sigue detectando igual.
 
 ## Orden completo, de punta a punta
 
