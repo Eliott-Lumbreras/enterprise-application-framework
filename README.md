@@ -2,13 +2,12 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 1 — Cimientos
+## Estado actual: Fase 3 — Plantillas
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
-- [x] Primer skill: `.claude/skills/architecture.md`
-- [ ] Fase 2 — Skills fundamentales (backend, frontend, base de datos, seguridad, logging, testing, docker, electron, powerbi, sql, mining, deployment, installer, documentation)
-- [ ] Fase 3 — Plantillas (Controller, Service, Repository, DTO, Entity, Migration, Swagger, Tests, Dockerfile, Electron, React Page)
+- [x] Fase 2 — 15 skills en `.claude/skills/`: architecture, backend, frontend, database, security, logging, testing, docker, electron, powerbi, sql, mining, deployment, installer, documentation
+- [x] Fase 3 — 12 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page
 - [ ] Fase 4 — Prompts inteligentes (create-module, create-report, create-dashboard, create-api, create-auth)
 - [ ] Fase 5 — Workflows encadenados (proyecto → BD → backend → frontend → Electron → Docker → tests → instalador)
 - [ ] Fase 6 — Checklists de calidad (seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos)
@@ -16,6 +15,45 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 - [ ] Fase 8 — Generadores de módulos
 - [ ] Fase 9 — Code Reviewer automático
 - [ ] Fase 10 — AI Architect (checklist de diseño antes de generar código)
+
+## Skills (Fase 2)
+
+| Skill | Rol |
+|---|---|
+| architecture.md | Senior Software Architect (Clean Architecture, SOLID, DDD) |
+| backend.md | Senior Backend Engineer (Clean Architecture, Repository Pattern, DI) |
+| frontend.md | Senior Frontend Engineer (responsive, dark mode, accesibilidad) |
+| database.md | Senior Database Engineer (PostgreSQL, migraciones, índices) |
+| security.md | Application Security Engineer (OWASP Top 10, Argon2, JWT) |
+| logging.md | Observability Engineer (logs estructurados, auditoría) |
+| testing.md | QA Engineer (unit + integration, cobertura >90%) |
+| docker.md | DevOps Engineer (Dockerfile multi-stage, compose) |
+| electron.md | Desktop Engineer (Electron, IPC seguro, auto-update) |
+| powerbi.md | Power BI / Analytics Engineer (modelo estrella, DAX, M) |
+| sql.md | SQL Engineer (consultas eficientes, índices, paginación) |
+| mining.md | Mining Operations Domain Expert (KPIs, turnos, compliance) |
+| deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
+| installer.md | Packaging Engineer (instaladores por SO) |
+| documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Plantillas (Fase 3)
+
+| Plantilla | Contenido |
+|---|---|
+| entity.template.ts | Entidad con columnas de auditoría obligatorias |
+| dto.template.ts | Create/Update DTO con class-validator |
+| repository.template.ts | Repository Pattern (único punto de acceso a datos) |
+| service.template.ts | Lógica de negocio, transacciones, logging, errores |
+| controller.template.ts | Endpoints REST + Swagger + guard de autenticación |
+| migration.template.ts | Migración reversible con índices/constraints |
+| swagger.bootstrap.template.ts | Configuración global de validación + Swagger |
+| unit-test.template.spec.ts | Test unitario del Service con mocks |
+| integration-test.template.spec.ts | Test e2e del Controller contra BD de prueba |
+| Dockerfile.template | Build multi-stage, usuario no root, HEALTHCHECK |
+| electron.main.template.ts / electron.preload.template.ts | Proceso principal + preload con contextIsolation |
+| react-page.template.tsx | Página con loading/empty/error states y confirmación de borrado |
+
+Convención de stack y placeholders documentada en `.claude/templates/README.md`.
 
 ## Estructura
 
