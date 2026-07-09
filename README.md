@@ -2,14 +2,14 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 4 — Prompts inteligentes
+## Estado actual: Fase 5 — Workflows
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
 - [x] Fase 2 — 15 skills en `.claude/skills/`: architecture, backend, frontend, database, security, logging, testing, docker, electron, powerbi, sql, mining, deployment, installer, documentation
 - [x] Fase 3 — 12 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page
 - [x] Fase 4 — 5 prompts en `.claude/prompts/`: create-module, create-report, create-dashboard, create-api, create-auth
-- [ ] Fase 5 — Workflows encadenados (proyecto → BD → backend → frontend → Electron → Docker → tests → instalador)
+- [x] Fase 5 — 4 workflows en `.claude/workflows/`: new-project, new-module, new-reporting-feature, release
 - [ ] Fase 6 — Checklists de calidad (seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos)
 - [ ] Fase 7 — Knowledge base específico de Fast2Mine (equipos, operadores, frentes, producción, KPIs, turnos, etc.)
 - [ ] Fase 8 — Generadores de módulos
@@ -35,6 +35,17 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Workflows (Fase 5)
+
+| Workflow | Cuando se usa |
+|---|---|
+| new-project.md | Proyecto -> BD -> Backend -> Frontend -> Electron -> Docker -> Tests -> Instalador |
+| new-module.md | Agregar un modulo CRUD a un proyecto existente |
+| new-reporting-feature.md | Reporte + dashboard de punta a punta |
+| release.md | Pasar de homologacion a produccion con rollback documentado |
+
+Cada workflow encadena los prompts (Fase 4) y skills (Fase 2) correspondientes, en el orden en que deben ejecutarse.
 
 ## Prompts (Fase 4)
 
