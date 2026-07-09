@@ -2,7 +2,7 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 7 — Knowledge base Fast2Mine
+## Estado actual: Fase 8 — Generadores de módulos
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
@@ -12,7 +12,7 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 - [x] Fase 5 — 4 workflows en `.claude/workflows/`: new-project, new-module, new-reporting-feature, release
 - [x] Fase 6 — 10 checklists + gate maestro en `.claude/checklists/`: seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos
 - [x] Fase 7 — Knowledge base en `.claude/knowledge-base/`: glosario, entidades confirmadas/pendientes, KPIs, turnos, fuentes de datos
-- [ ] Fase 8 — Generadores de módulos
+- [x] Fase 8 — Generadores de módulos: `scripts/generate-module.js` (Entity, DTO, Repository, Service, Controller, Migration, Unit test, Integration test, página Frontend a partir de un solo nombre de entidad)
 - [ ] Fase 9 — Code Reviewer automático
 - [ ] Fase 10 — AI Architect (checklist de diseño antes de generar código)
 
@@ -35,6 +35,24 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Generadores (Fase 8)
+
+`scripts/generate-module.js` toma un nombre de entidad y genera el módulo completo reutilizando las plantillas de la Fase 3 (sin duplicar sus reglas):
+
+```bash
+node scripts/generate-module.js Equipment
+node scripts/generate-module.js work-order --plural=work-orders
+```
+
+| Genera | No genera (alcance explícito) |
+|---|---|
+| Entity, DTO, Repository, Service, Controller | Swagger bootstrap (es global, no por módulo) |
+| Migration (con timestamp real, no placeholder) | Electron main/preload (globales de la app desktop) |
+| Unit test + Integration test | Log de auditoría centralizado (no hay plantilla validada aún) |
+| Página Frontend básica | Guard de permisos granulares por rol (ver checklists de Fase 6) |
+
+Cada archivo generado se vuelve a leer del disco para confirmar que no quedó truncado ni con placeholders sin resolver; si falta una plantilla o algo no cuadra, el script falla en vez de generar algo a medias. Detalle completo en `scripts/README.md`.
 
 ## Knowledge base Fast2Mine (Fase 7)
 
