@@ -2,7 +2,7 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 5 — Workflows
+## Estado actual: Fase 6 — Checklists de calidad
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
@@ -10,7 +10,7 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 - [x] Fase 3 — 12 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page
 - [x] Fase 4 — 5 prompts en `.claude/prompts/`: create-module, create-report, create-dashboard, create-api, create-auth
 - [x] Fase 5 — 4 workflows en `.claude/workflows/`: new-project, new-module, new-reporting-feature, release
-- [ ] Fase 6 — Checklists de calidad (seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos)
+- [x] Fase 6 — 10 checklists + gate maestro en `.claude/checklists/`: seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos
 - [ ] Fase 7 — Knowledge base específico de Fast2Mine (equipos, operadores, frentes, producción, KPIs, turnos, etc.)
 - [ ] Fase 8 — Generadores de módulos
 - [ ] Fase 9 — Code Reviewer automático
@@ -35,6 +35,23 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Checklists de calidad (Fase 6)
+
+| Checklist | Cubre |
+|---|---|
+| security.checklist.md | OWASP Top 10, secretos, Argon2, JWT, autorización |
+| testing.checklist.md | Unit + integration, cobertura, casos borde |
+| swagger.checklist.md | Documentación OpenAPI de cada endpoint |
+| logging.checklist.md | Logs estructurados, sin datos sensibles, health checks |
+| audit.checklist.md | created_by/updated_by, soft delete, audit log de auth |
+| performance.checklist.md | Paginación, N+1, índices, cache |
+| error-handling.checklist.md | Excepciones, códigos HTTP, rollback, resiliencia |
+| validation.checklist.md | DTOs, whitelist, validación de negocio |
+| roles.checklist.md | Roles como datos, menor privilegio, auditoría de cambios |
+| permissions.checklist.md | Permisos granulares, verificación real en backend |
+
+`module.checklist.md` es el gate consolidado: ningún módulo se marca terminado si falla alguno de los 10.
 
 ## Workflows (Fase 5)
 
