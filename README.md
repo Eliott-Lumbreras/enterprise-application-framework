@@ -2,13 +2,13 @@
 
 Framework interno reutilizable para generar aplicaciones empresariales (web, escritorio con Electron, móvil, APIs) con arquitectura, seguridad y calidad consistentes desde el primer commit.
 
-## Estado actual: Fase 3 — Plantillas
+## Estado actual: Fase 4 — Prompts inteligentes
 
 - [x] Estructura de carpetas base
 - [x] `.claude/CLAUDE.md` (director técnico: misión, estándares, seguridad, base de datos, calidad, testing, deployment)
 - [x] Fase 2 — 15 skills en `.claude/skills/`: architecture, backend, frontend, database, security, logging, testing, docker, electron, powerbi, sql, mining, deployment, installer, documentation
 - [x] Fase 3 — 12 plantillas en `.claude/templates/`: entity, dto, repository, service, controller, migration, swagger bootstrap, unit test, integration test, Dockerfile, Electron (main+preload), React page
-- [ ] Fase 4 — Prompts inteligentes (create-module, create-report, create-dashboard, create-api, create-auth)
+- [x] Fase 4 — 5 prompts en `.claude/prompts/`: create-module, create-report, create-dashboard, create-api, create-auth
 - [ ] Fase 5 — Workflows encadenados (proyecto → BD → backend → frontend → Electron → Docker → tests → instalador)
 - [ ] Fase 6 — Checklists de calidad (seguridad, pruebas, swagger, logs, auditoría, rendimiento, errores, validaciones, roles, permisos)
 - [ ] Fase 7 — Knowledge base específico de Fast2Mine (equipos, operadores, frentes, producción, KPIs, turnos, etc.)
@@ -35,6 +35,18 @@ Framework interno reutilizable para generar aplicaciones empresariales (web, esc
 | deployment.md | Release Engineer (CI/CD, rollback, ambientes) |
 | installer.md | Packaging Engineer (instaladores por SO) |
 | documentation.md | Technical Writer (README, Swagger, ADRs) |
+
+## Prompts (Fase 4)
+
+| Prompt | Se activa con |
+|---|---|
+| create-module.md | "Genera un modulo de X", "Crea el CRUD de X" |
+| create-report.md | "Necesito un reporte de X por turno", "Crea un endpoint de KPIs" |
+| create-dashboard.md | "Arma un dashboard de X", "Crea la pantalla de resumen" |
+| create-api.md | "Expon esto como API", "Crea el servicio backend para X" |
+| create-auth.md | "Agrega login", "Necesito autenticacion con roles" |
+
+Cada prompt referencia los skills (Fase 2) y plantillas (Fase 3) correspondientes; no duplica sus reglas.
 
 ## Plantillas (Fase 3)
 
