@@ -1,0 +1,5 @@
+{
+  "project": "Enterprise Application Framework",
+  "version": "0.1.0",
+  "description": "Configuracion base del proyecto. Se ira ampliando en fases posteriores (permisos de herramientas, hooks, etc.)."
+}
