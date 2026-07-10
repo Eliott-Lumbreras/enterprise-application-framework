@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1220" />
+<title>Aura Minerals - Turno</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="view-login" class="view active">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">AM</div>
+      <h1>Aura Minerals</h1>
+      <p class="subtitle">Visualizacion de turno &mdash; operacion minera</p>
+    </div>
+    <form id="form-login" autocomplete="off">
+      <label>Usuario
+        <input type="text" id="input-user" name="username" required autocomplete="username" />
+      </label>
+      <label>Contrasena
+        <input type="password" id="input-pass" name="password" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn-primary">Ingresar</button>
+      <p id="login-error" class="error-text" hidden></p>
+      <p id="login-loading" class="hint-text" hidden>Conectando...</p>
+    </form>
+    <button id="btn-open-settings-login" class="btn-link" type="button">Configuracion de conexion</button>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="view-dashboard" class="view">
+  <header class="app-header">
+    <div>
+      <h2>Aura Turno</h2>
+      <p id="header-subtitle" class="subtitle-sm"></p>
+    </div>
+    <button id="btn-open-settings" class="icon-btn" title="Configuracion" type="button">&#9881;</button>
+  </header>
+
+  <div id="report-list" class="report-list"></div>
+
+  <button id="btn-logout" class="btn-secondary" type="button">Cerrar sesion</button>
+</section>
+
+<!-- DETALLE DE REPORTE -->
+<section id="view-detail" class="view">
+  <header class="app-header">
+    <button id="btn-back" class="icon-btn" title="Volver" type="button">&#8592;</button>
+    <h2 id="detail-title">Reporte</h2>
+    <button id="btn-refresh" class="icon-btn" title="Actualizar" type="button">&#8635;</button>
+  </header>
+
+  <div class="segmented" id="period-segmented">
+    <button class="segmented-btn active" data-period="dia" type="button">Dia</button>
+    <button class="segmented-btn" data-period="semana" type="button">Semana</button>
+    <button class="segmented-btn" data-period="mes" type="button">Mes</button>
+  </div>
+  <p id="period-range" class="hint-text"></p>
+
+  <div id="detail-status" class="hint-text"></div>
+  <div id="pending-config" class="pending-box" hidden>
+    <p>Este reporte todavia no tiene columnas configuradas.</p>
+    <p class="hint-text">Dime el nombre del endpoint (ej. api/v1/xxx_report) y el mapeo de columnas (igual que hicimos con Acarreo) y lo dejo listo.</p>
+  </div>
+  <div id="kpi-row" class="kpi-row"></div>
+  <div id="detail-table-wrap" class="table-wrap"></div>
+</section>
+
+<!-- CONFIGURACION -->
+<section id="view-settings" class="view">
+  <header class="app-header">
+    <button id="btn-close-settings" class="icon-btn" title="Cerrar" type="button">&#8592;</button>
+    <h2>Configuracion de conexion</h2>
+  </header>
+  <form id="form-settings">
+    <label>URL base (proxy o API)
+      <input type="text" id="cfg-base-url" />
+    </label>
+    <label>Ruta de login
+      <input type="text" id="cfg-login-path" />
+    </label>
+    <label>Campo body: usuario
+      <input type="text" id="cfg-field-user" />
+    </label>
+    <label>Campo body: contrasena
+      <input type="text" id="cfg-field-pass" />
+    </label>
+    <label>Campo respuesta con el token (ej. access_token)
+      <input type="text" id="cfg-token-field" />
+    </label>
+    <label>Parametro fecha inicio
+      <input type="text" id="cfg-param-fecha-inicio" />
+    </label>
+    <label>Parametro fecha fin
+      <input type="text" id="cfg-param-fecha-fin" />
+    </label>
+    <button type="submit" class="btn-primary">Guardar configuracion</button>
+    <button type="button" id="btn-reset-settings" class="btn-secondary">Restaurar valores por defecto</button>
+  </form>
+  <p class="hint-text">Estos valores se guardan solo en este dispositivo (localStorage). Ajusta aqui los nombres reales una vez que confirmes el contrato exacto de cada endpoint.</p>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>

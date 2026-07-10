@@ -1,0 +1,12 @@
+{
+  "name": "aura-turno-proxy",
+  "version": "1.0.0",
+  "description": "Proxy CORS entre la PWA Aura Turno y la API de MiningControl",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}

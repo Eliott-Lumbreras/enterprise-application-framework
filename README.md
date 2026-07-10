@@ -34,6 +34,14 @@ node scripts/check-design.js equipment
 
 Regla explícita heredada del resto del framework: lo que no está confirmado se marca "Pendiente de confirmar", nunca se inventa. Probado con un doc sin llenar (falla las 7 secciones), uno completo (pasa) y uno con 6/7 llenas (falla solo la pendiente). Detalle en `scripts/README.md`.
 
+## Aplicaciones de referencia (mobile/)
+
+| App | Qué es | Design doc | Estado de revisión |
+|---|---|---|---|
+| `mobile/app-turno-movil/` | PWA de turno minero (Aura Turno) + proxy CORS. Primera app real integrada al framework. | `docs/design/app-turno-movil.design.md` (pasa `check-design.js`) | Revisión manual (JS plano, `review-module.js` solo cubre `.ts`/`.tsx` todavía) — ver su README para el detalle punto por punto |
+
+Al integrarla se encontró y corrigió un hallazgo real de seguridad: `renderTable`/`renderKpis` insertaban datos de la API directo en `innerHTML` sin escapar (XSS, OWASP Top 10). Se agregó `escapeHtml()` y se verificó contra un payload de prueba. Detalle completo en `mobile/app-turno-movil/README.md`.
+
 ## Skills (Fase 2)
 
 | Skill | Rol |
@@ -181,6 +189,7 @@ Enterprise-App-Framework/
 ├── frontend/
 ├── desktop/
 ├── mobile/
+│   └── app-turno-movil/  (PWA Aura Turno + proxy CORS, ver seccion de arriba)
 ├── database/
 ├── docs/
 │   └── design/          (design docs por módulo, Fase 10)

@@ -1,6 +1,6 @@
 # Entidades / reportes de datos
 
-Fuente real: proyecto "Aura Turno" (app-turno-movil), API `aura-aranzazu-dataapi.miningcontrol.cloud`.
+Fuente real: app "Aura Turno" (`mobile/app-turno-movil/`, dentro de este mismo repo), API `aura-aranzazu-dataapi.miningcontrol.cloud`. Design doc: `docs/design/app-turno-movil.design.md`.
 
 ## Confirmado: Acarreo (transport_report)
 
@@ -16,7 +16,7 @@ Boton del dashboard: ACARREO. Endpoint: `api/v1/transport_report`.
 | material | Tipo de material | Material |
 | calculated_mass | Tonelaje calculado | Tonelaje |
 
-KPIs ya implementados: Tonelaje total, Tonelaje promedio por viaje, N. de viajes (ver app-turno-movil, `REPORT_DEFS.transport_report`).
+KPIs ya implementados: Tonelaje total, Tonelaje promedio por viaje, N. de viajes (ver `mobile/app-turno-movil/app.js`, `REPORT_DEFS.transport_report`).
 
 ## Pendientes de confirmar
 
@@ -33,5 +33,5 @@ Estos endpoints ya se confirmaron como rutas validas de la API, pero sus columna
 
 1. El usuario prueba el endpoint real (con el token) y comparte la respuesta o los nombres de columna.
 2. Se actualiza este archivo moviendo el endpoint a la seccion "Confirmado" con su tabla de columnas.
-3. Se actualiza `REPORT_DEFS` en `app-turno-movil/app.js` (proyecto Conexiones Api) con el mapeo real, siguiendo el mismo patron que Acarreo.
+3. Se actualiza `REPORT_DEFS` en `mobile/app-turno-movil/app.js` (dentro de este repo) con el mapeo real, siguiendo el mismo patron que Acarreo.
 4. Se actualizan los KPIs del boton correspondiente contra el catalogo de `.claude/knowledge-base/kpis.md`.

@@ -3,7 +3,7 @@
 ## API principal
 
 - Dominio: `aura-aranzazu-dataapi.miningcontrol.cloud`.
-- Diseñada originalmente para Power Query (`Web.Contents`), por eso no aplica CORS para llamadas desde navegador (ver proxy en el proyecto Conexiones Api / app-turno-movil).
+- Diseñada originalmente para Power Query (`Web.Contents`), por eso no aplica CORS para llamadas desde navegador (ver proxy en `mobile/app-turno-movil/proxy-server/`, dentro de este mismo repo).
 
 ## Login (confirmado)
 
