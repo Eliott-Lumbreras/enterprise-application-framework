@@ -51,14 +51,31 @@ const REPORT_DEFS = {
     // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
     groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
   },
-  // Endpoint nuevo (2026-07-16), probablemente la API de Plan/metas
-  // mencionada como pendiente en el knowledge-base. Sin "columns" ni "kpis"
-  // a proposito: todavia no se conoce la forma real de la respuesta. Con
-  // esto vacio, la tabla generica de renderTable() muestra las columnas que
-  // la API realmente devuelva, sin inventar nada. Completar en cuanto se
-  // vea una respuesta real.
+  // Endpoint api/v1/goals (Plan/metas). Columnas confirmadas por el usuario
+  // el 2026-07-16. AUN PENDIENTE: el valor exacto de "planning_type" que
+  // corresponde a "plan mediano" (ver .claude/knowledge-base/entities.md).
+  // Hasta confirmar eso, "planning_type" se deja como columna visible en vez
+  // de aplicarse como filtro, para no adivinar el valor.
   goals_report: {
     path: "api/v1/goals",
+    columns: [
+      { key: "datetime_end", label: "Fecha" },
+      {
+        key: "level3id",
+        label: "Turno",
+        // Confirmado por el usuario 2026-07-16: en esta tabla 1=Noche, 2=Dia
+        // (numeracion propia de goals, distinta del texto "Turno 1/Turno 2"
+        // de transport_report).
+        format: (v) => (String(v) === "1" ? "Noche" : String(v) === "2" ? "Dia" : v),
+      },
+      { key: "level1value", label: "Lugar" },
+      { key: "level2value", label: "Material" },
+      { key: "planning_type", label: "Tipo plan" },
+      { key: "goal", label: "Meta" },
+    ],
+    kpis: [
+      { type: "sum", key: "goal", label: "Meta total" },
+    ],
   },
 };
 
@@ -433,7 +450,11 @@ function renderTable(rows, def) {
   const cols = def.columns ? def.columns : Object.keys(rows[0]).slice(0, 8).map((k) => ({ key: k, label: k }));
   let html = "<table><thead><tr>" + cols.map((c) => "<th>" + escapeHtml(c.label) + "</th>").join("") + "</tr></thead><tbody>";
   rows.forEach((r) => {
-    html += "<tr>" + cols.map((c) => "<td>" + escapeHtml(r[c.key] ?? "") + "</td>").join("") + "</tr>";
+    html += "<tr>" + cols.map((c) => {
+      const raw = r[c.key] ?? "";
+      const display = c.format ? c.format(raw, r) : raw;
+      return "<td>" + escapeHtml(display) + "</td>";
+    }).join("") + "</tr>";
   });
   html += "</tbody></table>";
   wrap.innerHTML = html;
