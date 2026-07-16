@@ -51,6 +51,15 @@ const REPORT_DEFS = {
     // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
     groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
   },
+  // Endpoint nuevo (2026-07-16), probablemente la API de Plan/metas
+  // mencionada como pendiente en el knowledge-base. Sin "columns" ni "kpis"
+  // a proposito: todavia no se conoce la forma real de la respuesta. Con
+  // esto vacio, la tabla generica de renderTable() muestra las columnas que
+  // la API realmente devuelva, sin inventar nada. Completar en cuanto se
+  // vea una respuesta real.
+  goals_report: {
+    path: "api/v1/goals",
+  },
 };
 
 /**
@@ -65,7 +74,11 @@ const BUTTONS = [
   { id: "relleno", label: "RELLENO", reportKey: null },
   { id: "equipos", label: "EQUIPOS", reportKey: null },
   { id: "obras", label: "OBRAS", reportKey: null },
-  { id: "otro", label: "OTRO", reportKey: null },
+  // Temporal: reutilizamos el boton "OTRO" para explorar api/v1/goals (Plan)
+  // mientras se confirma su forma real y su lugar definitivo en la UI (es
+  // posible que termine integrado como dato auxiliar de ACARREO en vez de
+  // ser un boton propio).
+  { id: "otro", label: "PLAN (explorando)", reportKey: "goals_report" },
 ];
 
 const STORAGE_CFG = "aura_config_overrides";

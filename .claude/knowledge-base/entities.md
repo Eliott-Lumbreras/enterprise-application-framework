@@ -30,14 +30,27 @@ Estos endpoints ya se confirmaron como rutas validas de la API, pero sus columna
 - `api/v1/load_report` (Carguio; candidato para un boton futuro, quiza relacionado con "RELLENO" si el relleno se registra como parte del ciclo de carguio)
 - `api/v1/telemetry_report` (telemetria de equipos: velocidad, combustible, alarmas — estructura no confirmada)
 
-## Pendiente: API de plan/metas
+## En exploracion: api/v1/goals (probable API de plan/metas)
 
-El usuario va a integrar una API separada de "plan" (metas de tonelaje por
-turno/hora) para poder calcular cumplimiento — no confirmado todavia, no
-inventar valores de meta mientras tanto. Existe un reporte Power BI de
-referencia ("Reporte de Acarreo de Mineral - Mina Aranzazu") que muestra el
-tipo de metricas esperadas (Plan Turno, Plan a la hora, % Cumpl, Proyeccion
-Turno) una vez que esa API este disponible.
+Endpoint nuevo (2026-07-16), agregado a `REPORT_DEFS` como `goals_report`
+SIN columnas ni KPIs definidos a proposito — la tabla generica de la app
+muestra lo que la API realmente devuelva, sin inventar campos. Colgado
+temporalmente del boton "OTRO" (renombrado "PLAN (explorando)") solo para
+poder verlo en pantalla mientras se confirma su forma real.
+
+Existe un reporte Power BI de referencia ("Reporte de Acarreo de Mineral -
+Mina Aranzazu") que muestra el tipo de metricas esperadas una vez mapeado
+(Plan Turno, Plan a la hora, % Cumpl, Proyeccion Turno).
+
+Pendiente antes de darlo por confirmado:
+1. Ver una respuesta real (columnas, si depende de dataIn/dataFi o de otro
+   parametro, si trae un valor por turno o por hora).
+2. Mapear columnas reales en `REPORT_DEFS.goals_report` (mismo patron que
+   Acarreo).
+3. Decidir su lugar definitivo en la UI: es probable que termine como dato
+   auxiliar mostrado junto a los KPIs de ACARREO (para calcular % cumplimiento
+   en la propia app) en vez de ser un boton/reporte propio — el boton "OTRO"
+   es solo un lugar temporal para explorarlo.
 
 ## Como pasar un endpoint de "pendiente" a "confirmado"
 
