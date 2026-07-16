@@ -79,6 +79,16 @@ const server = http.createServer(async (req, res) => {
       body: ["GET", "HEAD"].includes(req.method) ? undefined : body,
     });
     const buf = Buffer.from(await upstream.arrayBuffer());
+    if (!upstream.ok) {
+      // Solo para depuracion local: se imprime el CUERPO DE LA RESPUESTA del
+      // upstream (nunca el body de la request, que podria traer la password
+      // del login). Util mientras se confirman parametros/columnas pendientes
+      // (ver .claude/knowledge-base/data-sources.md). Quitar antes de produccion.
+      console.error(
+        "[proxy] upstream respondio " + upstream.status + " para " + req.method + " " + req.url +
+        "\n  body: " + buf.toString("utf8").slice(0, 500),
+      );
+    }
     res.writeHead(upstream.status, {
       "Content-Type": upstream.headers.get("content-type") || "application/json",
     });

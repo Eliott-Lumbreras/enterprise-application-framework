@@ -12,10 +12,14 @@ const DEFAULT_CONFIG = {
   fieldUser: "username",
   fieldPass: "password",
   tokenField: "access_token", // confirmado
-  // Nombres de parametro de query para el rango de fechas. AJUSTAR cuando se
-  // confirme el contrato real de cada endpoint (puede variar por endpoint).
-  paramFechaInicio: "fecha_inicio",
-  paramFechaFin: "fecha_fin",
+  // Nombres de parametro de query para el rango de fechas. CONFIRMADO para
+  // transport_report via el mensaje de error real de la API (2026-07-15):
+  // {"detail":"dataIn e dataFi sao obrigatorios quando last_update_timestamp
+  // nao for fornecido"} -> son "dataIn"/"dataFi" (portugues), no
+  // "fecha_inicio"/"fecha_fin" como se habia supuesto. Puede variar por
+  // endpoint: revisar cuando se confirme cada reporte pendiente.
+  paramFechaInicio: "dataIn",
+  paramFechaFin: "dataFi",
 };
 
 /**
@@ -35,6 +39,7 @@ const REPORT_DEFS = {
       { key: "operator_group", label: "Empresa" },
       { key: "equipment", label: "Camion" },
       { key: "load_equipment", label: "Scoop" },
+      { key: "origin_subarea", label: "Lugar" },
       { key: "material", label: "Material" },
       { key: "calculated_mass", label: "Tonelaje" },
     ],
@@ -43,6 +48,8 @@ const REPORT_DEFS = {
       { type: "avg", key: "calculated_mass", label: "Tonelaje prom/viaje" },
       { type: "count", label: "N. de viajes" },
     ],
+    // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
+    groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
   },
 };
 
@@ -140,10 +147,50 @@ async function apiFetchReport(path, params = {}) {
     throw new Error("Sesion expirada. Inicia sesion nuevamente.");
   }
   if (!res.ok) {
-    throw new Error("Error HTTP " + res.status + " al consultar " + path);
+    const detail = await extractErrorDetail(res);
+    throw new Error("Error HTTP " + res.status + " al consultar " + path + (detail ? ": " + detail : ""));
   }
-  const json = await res.json();
+  // Algunos endpoints de esta API devuelven el cuerpo vacio (no "[]") cuando
+  // no hay datos para el filtro pedido, en vez de un array JSON vacio. Se
+  // trata explicitamente como "sin datos" en vez de fallar con un error
+  // criptico de parseo.
+  const text = await res.text();
+  if (!text.trim()) return [];
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("La respuesta de " + path + " no es JSON valido: " + text.slice(0, 200));
+  }
   return normalizeRows(json);
+}
+
+/**
+ * Extrae el mensaje de error real que devuelve la API (util para depurar
+ * parametros/columnas no confirmados, ej. fecha_inicio/fecha_fin). Soporta
+ * el formato tipico de FastAPI ({"detail": "..."} o {"detail": [{"msg": ...}]})
+ * y cae a texto plano si no es JSON. Nunca lanza: si algo falla al leer el
+ * body, devuelve cadena vacia en vez de tapar el error original con otro.
+ */
+async function extractErrorDetail(res) {
+  try {
+    const text = await res.text();
+    if (!text) return "";
+    try {
+      const data = JSON.parse(text);
+      if (typeof data.detail === "string") return data.detail;
+      if (Array.isArray(data.detail)) {
+        return data.detail
+          .map((d) => (d && d.loc ? d.loc.join(".") + ": " + d.msg : JSON.stringify(d)))
+          .join(" | ");
+      }
+      return JSON.stringify(data).slice(0, 300);
+    } catch {
+      return text.slice(0, 300);
+    }
+  } catch {
+    return "";
+  }
 }
 
 function normalizeRows(json) {
@@ -267,6 +314,7 @@ async function openDetail(btn) {
     pendingBox.hidden = false;
     kpiRow.innerHTML = "";
     tableWrap.innerHTML = "";
+    document.getElementById("group-summary-wrap").innerHTML = "";
     status.hidden = true;
     return;
   }
@@ -290,6 +338,7 @@ async function loadDetail() {
   status.textContent = "Cargando...";
   kpiRow.innerHTML = "";
   tableWrap.innerHTML = "";
+  document.getElementById("group-summary-wrap").innerHTML = "";
 
   const params = {};
   params[cfg.paramFechaInicio] = range.start;
@@ -299,11 +348,53 @@ async function loadDetail() {
     const rows = await apiFetchReport(def.path, params);
     status.hidden = true;
     renderKpis(rows, def);
+    renderGroupSummary(rows, def);
     renderTable(rows, def);
   } catch (err) {
     status.hidden = false;
     status.textContent = err.message;
   }
+}
+
+/**
+ * Resumen agrupado (ej. tonelaje total por Scoop/"lugar"). Se calcula sobre
+ * las filas ya cargadas para el periodo actual, sin pedir nada nuevo a la
+ * API. Si el reporte no define "groupBy", no se muestra nada (no se inventa
+ * un agrupamiento generico).
+ */
+function renderGroupSummary(rows, def) {
+  const wrap = document.getElementById("group-summary-wrap");
+  if (!def.groupBy) {
+    wrap.innerHTML = "";
+    return;
+  }
+  if (!rows.length) {
+    wrap.innerHTML = "";
+    return;
+  }
+  const { key, label, valueKey } = def.groupBy;
+  const groups = new Map();
+  for (const r of rows) {
+    const groupValue = r[key] ?? "(sin valor)";
+    const amount = parseFloat(r[valueKey]);
+    const entry = groups.get(groupValue) || { total: 0, trips: 0 };
+    if (!isNaN(amount)) entry.total += amount;
+    entry.trips += 1;
+    groups.set(groupValue, entry);
+  }
+  const sorted = [...groups.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  let html = "<h3 class=\"group-summary-title\">Resumen por " + escapeHtml(label) + "</h3>";
+  html += "<div class=\"table-wrap\"><table><thead><tr>";
+  html += "<th>" + escapeHtml(label) + "</th><th>Total</th><th>N. viajes</th><th>Promedio</th>";
+  html += "</tr></thead><tbody>";
+  for (const [groupValue, entry] of sorted) {
+    const avg = entry.trips ? entry.total / entry.trips : 0;
+    html += "<tr><td>" + escapeHtml(groupValue) + "</td><td>" + escapeHtml(round2(entry.total)) +
+      "</td><td>" + escapeHtml(entry.trips) + "</td><td>" + escapeHtml(round2(avg)) + "</td></tr>";
+  }
+  html += "</tbody></table></div>";
+  wrap.innerHTML = html;
 }
 
 function renderKpis(rows, def) {
@@ -409,17 +500,3 @@ document.getElementById("btn-reset-settings").addEventListener("click", () => {
   localStorage.removeItem(STORAGE_CFG);
   fillSettingsForm();
 });
-
-/* ---------- INIT ---------- */
-
-(function init() {
-  if (getToken()) {
-    showView("view-dashboard");
-    renderDashboard();
-  } else {
-    showView("view-login");
-  }
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
-})();

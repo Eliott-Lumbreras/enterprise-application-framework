@@ -30,3 +30,7 @@ coverage/
 
 # Electron
 release/
+
+# Herramientas locales sueltas (ej. adb/platform-tools descargado por error aqui)
+platform-tools*/
+platform-tools*.zip

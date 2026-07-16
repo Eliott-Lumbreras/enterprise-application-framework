@@ -18,9 +18,15 @@
 
 Autenticacion: header `Authorization: Bearer <token>`.
 
-## Parametros de filtro (NO confirmados, son un supuesto razonable)
+## Parametros de filtro (confirmado para transport_report)
 
-`fecha_inicio` / `fecha_fin` como nombres de parametro de query. Si al probar contra la API real no filtran correctamente, ajustar en la app (pantalla Configuracion) y actualizar este documento.
+`dataIn` / `dataFi` (portugues: "data Inicial"/"data Final"), NO `fecha_inicio`/`fecha_fin` como se habia supuesto originalmente. Confirmado el 2026-07-15 leyendo el mensaje de error real de la API contra una prueba en dispositivo:
+
+```
+HTTP 400: {"detail":"dataIn e dataFi sao obrigatorios quando last_update_timestamp nao for fornecido"}
+```
+
+La API tambien acepta un modo alternativo via `last_update_timestamp` (no explorado todavia). Pendiente confirmar si `dataIn`/`dataFi` aplican igual a los otros 6 endpoints o si varian por reporte.
 
 ## Columnas de respuesta
 

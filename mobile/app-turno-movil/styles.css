@@ -185,6 +185,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
   margin: 10px 0 16px;
 }
 
+.group-summary-title {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 4px 0 8px;
+}
+
 /* KPI */
 .kpi-row {
   display: grid;
