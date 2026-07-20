@@ -50,12 +50,24 @@ const REPORT_DEFS = {
     ],
     // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
     groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
+    // Ligado a api/v1/goals (Plan) para comparar Real vs Plan por Lugar, segun
+    // el reporte Power BI de referencia ("Reporte de Acarreo de Mineral").
+    // NO es un boton/reporte propio: se trae de forma "best-effort" al cargar
+    // ACARREO y si falla (ej. el HTTP 500 visto el 2026-07-16) simplemente no
+    // se muestra la comparacion, sin romper el resto de la pantalla.
+    // Pendiente de confirmar con datos reales: si "planning_type" === "plan"
+    // ya corresponde a "plan mediano" o si falta otro campo para ese matiz
+    // (ver .claude/knowledge-base/entities.md).
+    planLink: {
+      path: "api/v1/goals",
+      filter: (row) => row.planning_type === "plan",
+      lugarKey: "level1value",
+      valueKey: "goal",
+    },
   },
-  // Endpoint api/v1/goals (Plan/metas). Columnas confirmadas por el usuario
-  // el 2026-07-16. AUN PENDIENTE: el valor exacto de "planning_type" que
-  // corresponde a "plan mediano" (ver .claude/knowledge-base/entities.md).
-  // Hasta confirmar eso, "planning_type" se deja como columna visible en vez
-  // de aplicarse como filtro, para no adivinar el valor.
+  // Endpoint api/v1/goals (Plan/metas). Se mantiene documentado aqui aunque
+  // ya no cuelga de un boton propio (ver planLink arriba): sus columnas se
+  // usan para armar la comparacion Real vs Plan dentro de ACARREO.
   goals_report: {
     path: "api/v1/goals",
     columns: [
@@ -91,11 +103,10 @@ const BUTTONS = [
   { id: "relleno", label: "RELLENO", reportKey: null },
   { id: "equipos", label: "EQUIPOS", reportKey: null },
   { id: "obras", label: "OBRAS", reportKey: null },
-  // Temporal: reutilizamos el boton "OTRO" para explorar api/v1/goals (Plan)
-  // mientras se confirma su forma real y su lugar definitivo en la UI (es
-  // posible que termine integrado como dato auxiliar de ACARREO en vez de
-  // ser un boton propio).
-  { id: "otro", label: "PLAN (explorando)", reportKey: "goals_report" },
+  // El Plan (api/v1/goals) ya no es un boton propio: se decidio (2026-07-17)
+  // ligarlo dentro de ACARREO para comparar Real vs Plan (ver
+  // REPORT_DEFS.transport_report.planLink).
+  { id: "otro", label: "OTRO", reportKey: null },
 ];
 
 const STORAGE_CFG = "aura_config_overrides";
@@ -377,8 +388,23 @@ async function loadDetail() {
   try {
     const rows = await apiFetchReport(def.path, params);
     status.hidden = true;
+
+    // Plan (api/v1/goals) ligado a ACARREO: se trae "best-effort" para no
+    // romper el reporte principal si el endpoint de Plan falla (ej. el
+    // HTTP 500 visto el 2026-07-16). Si falla, planRows queda en null y la
+    // comparacion Real vs Plan simplemente no se muestra.
+    let planRows = null;
+    if (def.planLink) {
+      try {
+        planRows = await apiFetchReport(def.planLink.path, params);
+      } catch (planErr) {
+        planRows = null;
+        console.warn("Plan (api/v1/goals) no disponible: " + planErr.message);
+      }
+    }
+
     renderKpis(rows, def);
-    renderGroupSummary(rows, def);
+    renderGroupSummary(rows, def, planRows);
     renderTable(rows, def);
   } catch (err) {
     status.hidden = false;
@@ -391,8 +417,14 @@ async function loadDetail() {
  * las filas ya cargadas para el periodo actual, sin pedir nada nuevo a la
  * API. Si el reporte no define "groupBy", no se muestra nada (no se inventa
  * un agrupamiento generico).
+ *
+ * Si el reporte define "planLink" y se pudo traer "planRows" (ver
+ * loadDetail), se agregan columnas "Meta" y "% Cumpl." comparando el total
+ * real de cada grupo (Lugar) contra la meta de Plan para ese mismo Lugar. Si
+ * planRows no esta disponible (endpoint de Plan caido, sin datos, etc.), la
+ * tabla se ve exactamente igual que antes: sin inventar columnas de plan.
  */
-function renderGroupSummary(rows, def) {
+function renderGroupSummary(rows, def, planRows) {
   const wrap = document.getElementById("group-summary-wrap");
   if (!def.groupBy) {
     wrap.innerHTML = "";
@@ -414,14 +446,39 @@ function renderGroupSummary(rows, def) {
   }
   const sorted = [...groups.entries()].sort((a, b) => b[1].total - a[1].total);
 
+  // Mapa Lugar -> meta total de Plan, si hay planLink y datos disponibles.
+  const planLink = def.planLink;
+  const planMap = new Map();
+  if (planLink && Array.isArray(planRows) && planRows.length) {
+    const planned = planLink.filter ? planRows.filter(planLink.filter) : planRows;
+    for (const p of planned) {
+      const lugar = p[planLink.lugarKey] ?? "(sin valor)";
+      const goal = parseFloat(p[planLink.valueKey]);
+      if (isNaN(goal)) continue;
+      planMap.set(lugar, (planMap.get(lugar) || 0) + goal);
+    }
+  }
+  const hasPlan = planMap.size > 0;
+
   let html = "<h3 class=\"group-summary-title\">Resumen por " + escapeHtml(label) + "</h3>";
   html += "<div class=\"table-wrap\"><table><thead><tr>";
   html += "<th>" + escapeHtml(label) + "</th><th>Total</th><th>N. viajes</th><th>Promedio</th>";
+  if (hasPlan) html += "<th>Meta</th><th>% Cumpl.</th>";
   html += "</tr></thead><tbody>";
   for (const [groupValue, entry] of sorted) {
     const avg = entry.trips ? entry.total / entry.trips : 0;
     html += "<tr><td>" + escapeHtml(groupValue) + "</td><td>" + escapeHtml(round2(entry.total)) +
-      "</td><td>" + escapeHtml(entry.trips) + "</td><td>" + escapeHtml(round2(avg)) + "</td></tr>";
+      "</td><td>" + escapeHtml(entry.trips) + "</td><td>" + escapeHtml(round2(avg)) + "</td>";
+    if (hasPlan) {
+      const goal = planMap.get(groupValue);
+      if (goal !== undefined && goal > 0) {
+        const pct = (entry.total / goal) * 100;
+        html += "<td>" + escapeHtml(round2(goal)) + "</td><td>" + escapeHtml(round2(pct)) + "%</td>";
+      } else {
+        html += "<td>-</td><td>-</td>";
+      }
+    }
+    html += "</tr>";
   }
   html += "</tbody></table></div>";
   wrap.innerHTML = html;
