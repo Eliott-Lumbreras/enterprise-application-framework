@@ -88,6 +88,18 @@ const server = http.createServer(async (req, res) => {
         "[proxy] upstream respondio " + upstream.status + " para " + req.method + " " + req.url +
         "\n  body: " + buf.toString("utf8").slice(0, 500),
       );
+    } else if (req.url.includes("/api/v1/transport_report")) {
+      // DIAGNOSTICO TEMPORAL (2026-07-21): transport_report esta devolviendo
+      // 200 OK pero con 0 filas para fechas donde el usuario confirma que ya
+      // hay viajes reales cargados. Como esto no es un error HTTP, el log de
+      // arriba no se activa. Este log si se activa siempre para
+      // transport_report (exito o no) para ver la URL exacta que se mando y
+      // el tamano real de la respuesta. Quitar una vez resuelto.
+      console.log(
+        "[proxy][transport_report] " + req.method + " " + req.url +
+        " -> HTTP " + upstream.status + ", body " + buf.length + " bytes" +
+        "\n  preview: " + buf.toString("utf8").slice(0, 300),
+      );
     }
     res.writeHead(upstream.status, {
       "Content-Type": upstream.headers.get("content-type") || "application/json",

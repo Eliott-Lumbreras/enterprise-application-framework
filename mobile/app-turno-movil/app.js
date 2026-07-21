@@ -329,17 +329,26 @@ async function refreshAcarreoLive() {
     const params = {};
     params[cfg.paramFechaInicio] = ctx.rangeStart;
     params[cfg.paramFechaFin] = ctx.rangeEnd;
-    const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, params);
+    let rows = await apiFetchReport(REPORT_DEFS.transport_report.path, params);
+
+    // Rellena el hueco de hoy (ver fetchTodayGapRows): dataIn/dataFi nunca
+    // trae el dia de hoy por el retraso de sincronizacion confirmado el
+    // 2026-07-21. Solo aplica si el turno en curso es el de hoy (para el
+    // Turno 2 que empezo ayer antes de las 7am, ctx.date ya es ayer y esa
+    // fecha si viene completa por dataIn/dataFi).
+    const todayStr = toISODate(new Date());
+    if (ctx.date === todayStr && !rows.some((r) => r.production_date === todayStr)) {
+      const gapRows = await fetchTodayGapRows();
+      rows = rows.concat(gapRows);
+    }
+
     const turnoRows = rows.filter((r) => r.turn === ctx.turnLabel && r.production_date === ctx.date);
     const total = turnoRows.reduce((sum, r) => sum + (parseFloat(r.calculated_mass) || 0), 0);
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, "0");
     const mm = String(now.getMinutes()).padStart(2, "0");
-    // Diagnostico temporal (2026-07-20): "N/M" = viajes que calzan con el
-    // turno actual / total de viajes traidos en el rango de fecha. Si N es 0
-    // pero M no, el rango de fecha esta bien pero "turn"/"production_date"
-    // no calzan con lo esperado (ej. "Turno 1" no es el texto real). Quitar
-    // este detalle una vez confirmado que funciona.
+    // "N/M" = viajes que calzan con el turno actual / total de viajes
+    // traidos (incluyendo el relleno de hoy).
     chipEl.textContent =
       round2(total) + " t en " + turnoRows.length + "/" + rows.length + " viajes - act. " + hh + ":" + mm;
   } catch (err) {
@@ -447,6 +456,11 @@ async function openDetail(btn) {
   const tableWrap = document.getElementById("detail-table-wrap");
   const status = document.getElementById("detail-status");
 
+  // Boton exploratorio de last_update_timestamp (ver testLastUpdateTimestamp):
+  // solo tiene sentido para ACARREO (transport_report), que es donde vimos
+  // el retraso de sincronizacion el 2026-07-21.
+  document.getElementById("btn-test-last-update").hidden = btn.reportKey !== "transport_report";
+
   if (!btn.reportKey) {
     pendingBox.hidden = false;
     kpiRow.innerHTML = "";
@@ -457,6 +471,95 @@ async function openDetail(btn) {
   }
   pendingBox.hidden = true;
   await loadDetail();
+}
+
+/**
+ * Prueba EXPLORATORIA (2026-07-21): la API menciono un parametro alterno
+ * "last_update_timestamp" como alternativa a dataIn/dataFi (visto en el
+ * mensaje de error real: "dataIn e dataFi sao obrigatorios quando
+ * last_update_timestamp nao for fornecido"). La idea es ver si consultando
+ * por ESTE parametro (en vez de por fecha de produccion) aparecen los viajes
+ * de hoy que la API todavia no refleja via dataIn/dataFi (ver el retraso de
+ * sincronizacion confirmado el 2026-07-21).
+ *
+ * No se conoce el formato exacto que espera este parametro: se prueba
+ * primero con una fecha simple (mismo formato que dataIn/dataFi). Si la API
+ * responde con un error, ese error deberia decir el formato correcto (igual
+ * que paso con dataIn/dataFi originalmente) — sin inventar el formato.
+ *
+ * Este boton NO reemplaza a Dia/Turno/Semana/Mes: es solo para explorar, y
+ * su resultado se muestra con columnas genericas (sin forzar el mapeo de
+ * columnas de transport_report), para no ocultar ningun campo nuevo que la
+ * API devuelva en este modo.
+ */
+async function testLastUpdateTimestamp() {
+  if (!currentButton || currentButton.reportKey !== "transport_report") return;
+  const status = document.getElementById("detail-status");
+  const kpiRow = document.getElementById("kpi-row");
+  const rangeLabel = document.getElementById("period-range");
+  document.getElementById("group-summary-wrap").innerHTML = "";
+  kpiRow.innerHTML = "";
+  status.hidden = false;
+  status.textContent = "Probando last_update_timestamp (exploratorio)...";
+
+  const testValue = toISODate(new Date());
+  rangeLabel.textContent = "PRUEBA last_update_timestamp=" + testValue + " (no reemplaza Dia/Turno/Semana/Mes)";
+
+  try {
+    const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, { last_update_timestamp: testValue });
+    status.hidden = true;
+    kpiRow.innerHTML =
+      "<div class=\"hint-text\">" + rows.length + " fila(s) devueltas con last_update_timestamp=" +
+      escapeHtml(testValue) + "</div>";
+
+    // Diagnostico completo (no la tabla generica de 8 columnas): se muestran
+    // TODOS los nombres de columna reales y el contenido completo de la
+    // primera fila, para comparar contra el esquema conocido de
+    // transport_report (calculated_mass, turn, production_date,
+    // origin_subarea) sin depender de scroll horizontal.
+    const tableWrap = document.getElementById("detail-table-wrap");
+    if (rows.length) {
+      const keys = Object.keys(rows[0]);
+      tableWrap.innerHTML =
+        "<p class=\"hint-text\">Columnas reales (" + keys.length + "): " + escapeHtml(keys.join(", ")) + "</p>" +
+        "<pre style=\"white-space:pre-wrap;font-size:11px;background:var(--card);border:1px solid #253253;border-radius:10px;padding:10px;\">" +
+        escapeHtml(JSON.stringify(rows[0], null, 2)) + "</pre>";
+    } else {
+      tableWrap.innerHTML = "<p class=\"hint-text\">0 filas.</p>";
+    }
+  } catch (err) {
+    status.hidden = false;
+    status.textContent = "last_update_timestamp (exploratorio) fallo: " + err.message;
+  }
+}
+
+/**
+ * Complemento para el retraso de sincronizacion confirmado el 2026-07-21:
+ * cuando el rango de fecha de una consulta a transport_report llega hasta
+ * HOY, "dataIn"/"dataFi" no trae los viajes de hoy (la API responde 204
+ * vacio para ese dia en concreto, aunque ya haya viajes reales cargados en
+ * el sistema de origen). Se confirmo con datos reales que consultando por
+ * el parametro alterno "last_update_timestamp=<hoy>" SI aparecen esos
+ * viajes (169 filas reales el 2026-07-21, con el mismo esquema conocido:
+ * calculated_mass, turn, production_date, origin_subarea, etc.).
+ *
+ * Se filtra el resultado por production_date === hoy antes de usarlo, ya
+ * que last_update_timestamp probablemente trae CUALQUIER fila actualizada
+ * hoy (por ejemplo, una correccion a un viaje de una fecha anterior),  no
+ * solo los viajes cuya fecha de produccion sea hoy.
+ *
+ * "Best-effort": si esto falla, simplemente no se rellena el hueco de hoy
+ * (el resto del reporte sigue funcionando con lo que si trajo dataIn/dataFi).
+ */
+async function fetchTodayGapRows() {
+  const todayStr = toISODate(new Date());
+  try {
+    const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, { last_update_timestamp: todayStr });
+    return rows.filter((r) => r.production_date === todayStr);
+  } catch (err) {
+    console.warn("No se pudo rellenar el hueco de hoy via last_update_timestamp: " + err.message);
+    return [];
+  }
 }
 
 async function loadDetail() {
@@ -528,6 +631,19 @@ async function loadDetail() {
         rows = kept.concat(rows);
       }
       monthRowsCache = { monthKey, rows };
+    }
+
+    // Rellena el hueco de hoy (ver fetchTodayGapRows) si el rango pedido
+    // llega hasta la fecha de hoy: dataIn/dataFi nunca trae el dia de hoy
+    // por el retraso de sincronizacion confirmado el 2026-07-21.
+    const todayStr = toISODate(new Date());
+    const targetDateForGap = isTurno ? turnoCtx.date : range.end;
+    if (isTransport && targetDateForGap === todayStr) {
+      const alreadyHasToday = rows.some((r) => r.production_date === todayStr);
+      if (!alreadyHasToday) {
+        const gapRows = await fetchTodayGapRows();
+        rows = rows.concat(gapRows);
+      }
     }
 
     // Acota al turno exacto (no solo al rango de fecha): necesario sobre
@@ -703,6 +819,7 @@ document.getElementById("btn-back").addEventListener("click", () => {
   refreshAcarreoLive();
 });
 document.getElementById("btn-refresh").addEventListener("click", loadDetail);
+document.getElementById("btn-test-last-update").addEventListener("click", testLastUpdateTimestamp);
 
 // Mantiene actualizado el chip de "turno en curso" del boton ACARREO
 // mientras el usuario esta en el dashboard (sin recargar la pagina).
