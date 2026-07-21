@@ -68,7 +68,9 @@ const REPORT_DEFS = {
     // (ver .claude/knowledge-base/entities.md).
     planLink: {
       path: "api/v1/goals",
-      filter: (row) => row.planning_type === "plan",
+      // Tambien solo Material "Mineral" (level2value), igual que el resto
+      // de ACARREO (pedido del usuario 2026-07-21).
+      filter: (row) => row.planning_type === "plan" && row.level2value === "Mineral",
       lugarKey: "level1value",
       valueKey: "goal",
     },
@@ -330,6 +332,9 @@ async function refreshAcarreoLive() {
     params[cfg.paramFechaInicio] = ctx.rangeStart;
     params[cfg.paramFechaFin] = ctx.rangeEnd;
     let rows = await apiFetchReport(REPORT_DEFS.transport_report.path, params);
+    // Mismo filtro de material que el resto de ACARREO (pedido del usuario
+    // 2026-07-21): solo "Mineral".
+    rows = rows.filter((r) => r.material === "Mineral");
 
     // Rellena el hueco de hoy (ver fetchTodayGapRows): dataIn/dataFi nunca
     // trae el dia de hoy por el retraso de sincronizacion confirmado el
@@ -555,7 +560,8 @@ async function fetchTodayGapRows() {
   const todayStr = toISODate(new Date());
   try {
     const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, { last_update_timestamp: todayStr });
-    return rows.filter((r) => r.production_date === todayStr);
+    // Mismo filtro de material que el resto de ACARREO (ver loadDetail).
+    return rows.filter((r) => r.production_date === todayStr && r.material === "Mineral");
   } catch (err) {
     console.warn("No se pudo rellenar el hueco de hoy via last_update_timestamp: " + err.message);
     return [];
@@ -621,6 +627,14 @@ async function loadDetail() {
   try {
     let rows = await apiFetchReport(def.path, params);
     status.hidden = true;
+
+    // Pedido del usuario (2026-07-21): ACARREO solo contempla material
+    // "Mineral" (coincide con el filtro "Material: Mineral" del reporte
+    // Power BI de referencia). Se descarta cualquier otro material antes de
+    // cachear/calcular nada.
+    if (isTransport) {
+      rows = rows.filter((r) => r.material === "Mineral");
+    }
 
     if (useMonthCache) {
       if (haveValidMonthCache) {
