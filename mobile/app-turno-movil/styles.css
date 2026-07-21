@@ -128,7 +128,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
   background: var(--report-btn);
   border: none;
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 16px 20px;
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -136,12 +136,19 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
   text-align: left;
   cursor: pointer;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
 .report-btn:active,
 .report-btn:hover { background: var(--report-btn-hover); }
 .report-btn.pending { opacity: 0.55; }
+.report-btn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
 .report-btn .chip {
   font-size: 10px;
   font-weight: 600;
@@ -150,6 +157,12 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
   border-radius: 20px;
   text-transform: none;
   letter-spacing: normal;
+}
+.report-btn-sub {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 /* Segmented control (Dia / Semana / Mes) */

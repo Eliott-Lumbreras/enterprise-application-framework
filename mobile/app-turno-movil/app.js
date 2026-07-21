@@ -245,8 +245,20 @@ function normalizeRows(json) {
 
 let currentPeriod = "dia";
 
+/**
+ * Formatea una fecha como YYYY-MM-DD usando el CALENDARIO LOCAL del
+ * dispositivo (no UTC). BUG CORREGIDO 2026-07-20: la version anterior usaba
+ * d.toISOString(), que convierte a UTC. En una zona horaria como Mexico
+ * (UTC-6), cualquier hora local entre aprox. 18:00 y 23:59 cae ya en el dia
+ * siguiente en UTC -justo el arranque del Turno 2 (19:00)-, asi que
+ * getCurrentTurnoContext() armaba la fecha/rango equivocados (un dia
+ * adelantados) y el chip de "turno en curso" siempre daba 0.
+ */
 function toISODate(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
 }
 
 function getPeriodRange(period) {
@@ -259,6 +271,72 @@ function getPeriodRange(period) {
     start = new Date(today.getFullYear(), today.getMonth(), 1);
   }
   return { start: toISODate(start), end: toISODate(end) };
+}
+
+/**
+ * Determina el turno en curso segun la hora actual, de acuerdo a los
+ * horarios confirmados por el usuario (2026-07-16):
+ * Turno 1 (dia): 07:00 a 18:59. Turno 2 (noche): 19:00 a 06:59 del dia
+ * siguiente (cruza medianoche).
+ *
+ * ASUNCION pendiente de confirmar con datos reales: para el turno de noche
+ * se asume que "production_date" queda registrado con la fecha en que
+ * INICIA el turno (el dia en que son las 19:00), no la fecha en que termina.
+ * Si al revisar datos reales resulta ser al reves, ajustar "date" abajo.
+ */
+function getCurrentTurnoContext(now = new Date()) {
+  const hour = now.getHours();
+  if (hour >= 7 && hour < 19) {
+    const date = toISODate(now);
+    return { turnLabel: "Turno 1", turnShortLabel: "Dia", date, rangeStart: date, rangeEnd: date };
+  }
+  const shiftStart = new Date(now);
+  if (hour < 7) shiftStart.setDate(shiftStart.getDate() - 1);
+  const shiftEnd = new Date(shiftStart);
+  shiftEnd.setDate(shiftEnd.getDate() + 1);
+  return {
+    turnLabel: "Turno 2",
+    turnShortLabel: "Noche",
+    date: toISODate(shiftStart),
+    rangeStart: toISODate(shiftStart),
+    rangeEnd: toISODate(shiftEnd),
+  };
+}
+
+/**
+ * Refresca el chip "en vivo" del boton ACARREO en el dashboard con el
+ * tonelaje acumulado del turno en curso (segun getCurrentTurnoContext). Se
+ * llama al mostrar el dashboard y cada vez que se vuelve a el. Nunca lanza:
+ * si la API falla, el chip muestra un mensaje corto de error en vez de
+ * romper el dashboard.
+ */
+async function refreshAcarreoLive() {
+  const chipEl = document.getElementById("acarreo-live-chip");
+  if (!chipEl) return;
+  if (!getToken()) return;
+  chipEl.textContent = "Actualizando turno actual...";
+  try {
+    const ctx = getCurrentTurnoContext();
+    const cfg = getConfig();
+    const params = {};
+    params[cfg.paramFechaInicio] = ctx.rangeStart;
+    params[cfg.paramFechaFin] = ctx.rangeEnd;
+    const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, params);
+    const turnoRows = rows.filter((r) => r.turn === ctx.turnLabel && r.production_date === ctx.date);
+    const total = turnoRows.reduce((sum, r) => sum + (parseFloat(r.calculated_mass) || 0), 0);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    // Diagnostico temporal (2026-07-20): "N/M" = viajes que calzan con el
+    // turno actual / total de viajes traidos en el rango de fecha. Si N es 0
+    // pero M no, el rango de fecha esta bien pero "turn"/"production_date"
+    // no calzan con lo esperado (ej. "Turno 1" no es el texto real). Quitar
+    // este detalle una vez confirmado que funciona.
+    chipEl.textContent =
+      round2(total) + " t en " + turnoRows.length + "/" + rows.length + " viajes - act. " + hh + ":" + mm;
+  } catch (err) {
+    chipEl.textContent = "Turno actual: sin datos (" + err.message.slice(0, 60) + ")";
+  }
 }
 
 /* ---------- KPIs ---------- */
@@ -326,15 +404,20 @@ function renderDashboard() {
   const list = document.getElementById("report-list");
   list.innerHTML = "";
   BUTTONS.forEach((btn) => {
+    const isAcarreo = btn.id === "acarreo";
     const el = document.createElement("button");
     el.type = "button";
     el.className = "report-btn" + (btn.reportKey ? "" : " pending");
-    el.innerHTML = "<span>" + escapeHtml(btn.label) + "</span>" + (btn.reportKey ? "" : "<span class=\"chip\">pendiente</span>");
+    el.innerHTML =
+      "<span class=\"report-btn-row\"><span>" + escapeHtml(btn.label) + "</span>" +
+      (btn.reportKey ? "" : "<span class=\"chip\">pendiente</span>") + "</span>" +
+      (isAcarreo ? "<span class=\"report-btn-sub\" id=\"acarreo-live-chip\">Cargando turno actual...</span>" : "");
     el.addEventListener("click", () => openDetail(btn));
     list.appendChild(el);
   });
   const user = sessionStorage.getItem(STORAGE_USER) || "";
   document.getElementById("header-subtitle").textContent = user ? "Sesion: " + user : "";
+  refreshAcarreoLive();
 }
 
 let currentButton = null;
@@ -372,8 +455,16 @@ async function loadDetail() {
   const rangeLabel = document.getElementById("period-range");
 
   const cfg = getConfig();
-  const range = getPeriodRange(currentPeriod);
-  rangeLabel.textContent = range.start === range.end ? range.start : range.start + " a " + range.end;
+  // "Turno" es un periodo especial: en vez de un rango de dias fijo (Dia /
+  // Semana / Mes), usa getCurrentTurnoContext() para saber que turno esta
+  // corriendo ahora mismo (puede abarcar 2 fechas de calendario si es el
+  // Turno 2 de noche).
+  const isTurno = currentPeriod === "turno";
+  const turnoCtx = isTurno ? getCurrentTurnoContext() : null;
+  const range = isTurno ? { start: turnoCtx.rangeStart, end: turnoCtx.rangeEnd } : getPeriodRange(currentPeriod);
+  rangeLabel.textContent = isTurno
+    ? turnoCtx.turnLabel + " (" + turnoCtx.turnShortLabel + ") - " + turnoCtx.date
+    : (range.start === range.end ? range.start : range.start + " a " + range.end);
 
   status.hidden = false;
   status.textContent = "Cargando...";
@@ -386,8 +477,14 @@ async function loadDetail() {
   params[cfg.paramFechaFin] = range.end;
 
   try {
-    const rows = await apiFetchReport(def.path, params);
+    let rows = await apiFetchReport(def.path, params);
     status.hidden = true;
+
+    // Acota al turno exacto (no solo al rango de fecha): necesario sobre
+    // todo para el Turno 2, cuyo rango incluye 2 fechas de calendario.
+    if (isTurno && currentButton.reportKey === "transport_report") {
+      rows = rows.filter((r) => r.turn === turnoCtx.turnLabel && r.production_date === turnoCtx.date);
+    }
 
     // Plan (api/v1/goals) ligado a ACARREO: se trae "best-effort" para no
     // romper el reporte principal si el endpoint de Plan falla (ej. el
@@ -551,8 +648,18 @@ document.getElementById("form-login").addEventListener("submit", async (e) => {
 });
 
 document.getElementById("btn-logout").addEventListener("click", logout);
-document.getElementById("btn-back").addEventListener("click", () => showView("view-dashboard"));
+document.getElementById("btn-back").addEventListener("click", () => {
+  showView("view-dashboard");
+  refreshAcarreoLive();
+});
 document.getElementById("btn-refresh").addEventListener("click", loadDetail);
+
+// Mantiene actualizado el chip de "turno en curso" del boton ACARREO
+// mientras el usuario esta en el dashboard (sin recargar la pagina).
+setInterval(() => {
+  const dashboard = document.getElementById("view-dashboard");
+  if (dashboard && dashboard.classList.contains("active")) refreshAcarreoLive();
+}, 5 * 60 * 1000);
 
 document.querySelectorAll(".segmented-btn").forEach((b) => {
   b.addEventListener("click", () => {
