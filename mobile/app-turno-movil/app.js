@@ -22,6 +22,14 @@ const DEFAULT_CONFIG = {
   paramFechaFin: "dataFi",
 };
 
+// Pedido del usuario (2026-07-21): ACARREO (transport_report) se actualiza
+// solo cada 10 minutos, y esa actualizacion NO vuelve a pedir todos los
+// datos: para el periodo "Mes" solo busca cambios de los ultimos 7 dias y
+// los combina con el resto del mes que ya se tenia (ver monthRowsCache en
+// loadDetail), para que la actualizacion no tarde.
+const TRANSPORT_AUTO_REFRESH_MS = 10 * 60 * 1000;
+const TRANSPORT_MAX_LOOKBACK_DAYS = 7;
+
 /**
  * REPORT_DEFS: un registro por endpoint real de la API, con el mapeo de
  * columnas (nombre de campo devuelto por la API -> etiqueta en pantalla) y
@@ -422,6 +430,11 @@ function renderDashboard() {
 
 let currentButton = null;
 
+// Cache incremental del periodo "Mes" de ACARREO (ver loadDetail). Vive solo
+// en memoria: se pierde si se recarga la pagina, y se invalida sola si
+// cambia el mes (monthKey).
+let monthRowsCache = null;
+
 async function openDetail(btn) {
   currentButton = btn;
   document.getElementById("detail-title").textContent = btn.label;
@@ -462,6 +475,7 @@ async function loadDetail() {
   const isTurno = currentPeriod === "turno";
   const turnoCtx = isTurno ? getCurrentTurnoContext() : null;
   const range = isTurno ? { start: turnoCtx.rangeStart, end: turnoCtx.rangeEnd } : getPeriodRange(currentPeriod);
+
   rangeLabel.textContent = isTurno
     ? turnoCtx.turnLabel + " (" + turnoCtx.turnShortLabel + ") - " + turnoCtx.date
     : (range.start === range.end ? range.start : range.start + " a " + range.end);
@@ -472,17 +486,53 @@ async function loadDetail() {
   tableWrap.innerHTML = "";
   document.getElementById("group-summary-wrap").innerHTML = "";
 
+  const isTransport = currentButton.reportKey === "transport_report";
+
+  // Cache incremental para "Mes" de ACARREO (pedido del usuario 2026-07-21):
+  // la primera vez que se abre "Mes" se trae el mes completo (dia 1 a hoy).
+  // Las actualizaciones siguientes (automatica cada 10 min, o el boton
+  // Actualizar) YA NO vuelven a pedir todo el mes: solo piden los ultimos 7
+  // dias (posibles cambios/nuevos viajes) y los combinan con lo que ya se
+  // tenia guardado del resto del mes, en vez de descartarlo.
+  const useMonthCache = isTransport && !isTurno && currentPeriod === "mes";
+  let monthKey = null;
+  let recentStartStr = null;
+  if (useMonthCache) {
+    const today = new Date();
+    monthKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0");
+    const recentStart = new Date();
+    recentStart.setDate(recentStart.getDate() - (TRANSPORT_MAX_LOOKBACK_DAYS - 1));
+    recentStartStr = toISODate(recentStart);
+  }
+  const haveValidMonthCache = useMonthCache && monthRowsCache && monthRowsCache.monthKey === monthKey;
+
   const params = {};
-  params[cfg.paramFechaInicio] = range.start;
-  params[cfg.paramFechaFin] = range.end;
+  if (haveValidMonthCache) {
+    params[cfg.paramFechaInicio] = recentStartStr;
+    params[cfg.paramFechaFin] = range.end;
+  } else {
+    params[cfg.paramFechaInicio] = range.start;
+    params[cfg.paramFechaFin] = range.end;
+  }
 
   try {
     let rows = await apiFetchReport(def.path, params);
     status.hidden = true;
 
+    if (useMonthCache) {
+      if (haveValidMonthCache) {
+        // Conserva del cache todo lo anterior a los ultimos 7 dias (no se
+        // volvio a pedir), y reemplaza esos ultimos 7 dias con lo recien
+        // traido.
+        const kept = monthRowsCache.rows.filter((r) => (r.production_date ?? "") < recentStartStr);
+        rows = kept.concat(rows);
+      }
+      monthRowsCache = { monthKey, rows };
+    }
+
     // Acota al turno exacto (no solo al rango de fecha): necesario sobre
     // todo para el Turno 2, cuyo rango incluye 2 fechas de calendario.
-    if (isTurno && currentButton.reportKey === "transport_report") {
+    if (isTurno && isTransport) {
       rows = rows.filter((r) => r.turn === turnoCtx.turnLabel && r.production_date === turnoCtx.date);
     }
 
@@ -660,6 +710,19 @@ setInterval(() => {
   const dashboard = document.getElementById("view-dashboard");
   if (dashboard && dashboard.classList.contains("active")) refreshAcarreoLive();
 }, 5 * 60 * 1000);
+
+// Auto-actualiza la vista de detalle de ACARREO (transport_report) cada 10
+// minutos mientras esta abierta, sin que el usuario tenga que tocar
+// "Actualizar" (pedido del usuario 2026-07-21). El tope de 7 dias en
+// loadDetail() (TRANSPORT_MAX_LOOKBACK_DAYS) es lo que evita que esta
+// actualizacion automatica tarde.
+setInterval(() => {
+  const detailView = document.getElementById("view-detail");
+  const isAcarreoOpen =
+    detailView && detailView.classList.contains("active") &&
+    currentButton && currentButton.reportKey === "transport_report";
+  if (isAcarreoOpen) loadDetail();
+}, TRANSPORT_AUTO_REFRESH_MS);
 
 document.querySelectorAll(".segmented-btn").forEach((b) => {
   b.addEventListener("click", () => {
