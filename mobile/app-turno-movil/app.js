@@ -332,9 +332,9 @@ async function refreshAcarreoLive() {
     params[cfg.paramFechaInicio] = ctx.rangeStart;
     params[cfg.paramFechaFin] = ctx.rangeEnd;
     let rows = await apiFetchReport(REPORT_DEFS.transport_report.path, params);
-    // Mismo filtro de material que el resto de ACARREO (pedido del usuario
-    // 2026-07-21): solo "Mineral".
-    rows = rows.filter((r) => r.material === "Mineral");
+    // Mismos filtros que el resto de ACARREO (pedido del usuario 2026-07-21):
+    // solo "Mineral" y excluye viajes "Interrupted".
+    rows = rows.filter((r) => r.material === "Mineral" && r.exception_type !== "Interrupted");
 
     // Rellena el hueco de hoy (ver fetchTodayGapRows): dataIn/dataFi nunca
     // trae el dia de hoy por el retraso de sincronizacion confirmado el
@@ -560,8 +560,10 @@ async function fetchTodayGapRows() {
   const todayStr = toISODate(new Date());
   try {
     const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, { last_update_timestamp: todayStr });
-    // Mismo filtro de material que el resto de ACARREO (ver loadDetail).
-    return rows.filter((r) => r.production_date === todayStr && r.material === "Mineral");
+    // Mismos filtros que el resto de ACARREO (ver loadDetail).
+    return rows.filter((r) =>
+      r.production_date === todayStr && r.material === "Mineral" && r.exception_type !== "Interrupted"
+    );
   } catch (err) {
     console.warn("No se pudo rellenar el hueco de hoy via last_update_timestamp: " + err.message);
     return [];
@@ -630,10 +632,11 @@ async function loadDetail() {
 
     // Pedido del usuario (2026-07-21): ACARREO solo contempla material
     // "Mineral" (coincide con el filtro "Material: Mineral" del reporte
-    // Power BI de referencia). Se descarta cualquier otro material antes de
-    // cachear/calcular nada.
+    // Power BI de referencia), y excluye los viajes marcados como
+    // exception_type "Interrupted" (viaje interrumpido, no valido para
+    // contar tonelaje/viajes). Se descarta antes de cachear/calcular nada.
     if (isTransport) {
-      rows = rows.filter((r) => r.material === "Mineral");
+      rows = rows.filter((r) => r.material === "Mineral" && r.exception_type !== "Interrupted");
     }
 
     if (useMonthCache) {
