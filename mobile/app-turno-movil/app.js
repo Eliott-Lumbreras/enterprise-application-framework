@@ -181,6 +181,25 @@ function joinUrl(base, path) {
   return base.replace(/\/$/, "") + "/" + String(path).replace(/^\//, "");
 }
 
+// Limite simple de velocidad entre llamadas a la API (2026-07-22): la API
+// respondio HTTP 429 ("Muitas requisicoes, tente novamente mais tarde")
+// despues de varias pruebas seguidas. Esto espacia TODAS las llamadas de
+// apiFetchReport (minimo MIN_API_GAP_MS entre una y la siguiente, en orden),
+// sin tener que cambiar nada en quien la llama.
+const MIN_API_GAP_MS = 1200;
+let lastApiCallAt = 0;
+let apiCallChain = Promise.resolve();
+
+function waitForApiSlot() {
+  const slot = apiCallChain.then(
+    () => new Promise((resolve) => setTimeout(resolve, Math.max(0, lastApiCallAt + MIN_API_GAP_MS - Date.now())))
+  );
+  apiCallChain = slot;
+  return slot.then(() => {
+    lastApiCallAt = Date.now();
+  });
+}
+
 async function apiFetchReport(path, params = {}) {
   const token = getToken();
   const cfg = getConfig();
@@ -189,6 +208,8 @@ async function apiFetchReport(path, params = {}) {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
   });
 
+  await waitForApiSlot();
+
   const res = await fetch(url.toString(), {
     headers: { Authorization: "Bearer " + token },
   });
@@ -196,6 +217,11 @@ async function apiFetchReport(path, params = {}) {
   if (res.status === 401) {
     logout();
     throw new Error("Sesion expirada. Inicia sesion nuevamente.");
+  }
+  if (res.status === 429) {
+    throw new Error(
+      "La API esta limitando las solicitudes por exceso de trafico (HTTP 429). Espera unos segundos y vuelve a intentar."
+    );
   }
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
