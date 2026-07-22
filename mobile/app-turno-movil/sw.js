@@ -1,4 +1,4 @@
-const CACHE = "aura-turno-shell-v23";
+const CACHE = "aura-turno-shell-v27";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", (e) => {

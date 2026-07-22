@@ -58,40 +58,52 @@ const REPORT_DEFS = {
     ],
     // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
     groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
-    // Ligado a api/v1/goals (Plan) para comparar Real vs Plan por Lugar, segun
-    // el reporte Power BI de referencia ("Reporte de Acarreo de Mineral").
-    // NO es un boton/reporte propio: se trae de forma "best-effort" al cargar
-    // ACARREO y si falla (ej. el HTTP 500 visto el 2026-07-16) simplemente no
-    // se muestra la comparacion, sin romper el resto de la pantalla.
+    // Ligado a api/v1/dw_goals (Plan) para comparar Real vs Plan por Lugar,
+    // segun el reporte Power BI de referencia ("Reporte de Acarreo de
+    // Mineral"). CAMBIO 2026-07-22: se cambio de "api/v1/goals" (que
+    // consistentemente devolvia HTTP 500 con cualquier parametro probado) a
+    // "api/v1/dw_goals" (endpoint alterno indicado por el usuario, con el
+    // mismo esquema de campos). NO es un boton/reporte propio: se trae de
+    // forma "best-effort" al cargar ACARREO y si falla simplemente no se
+    // muestra la comparacion, sin romper el resto de la pantalla.
+    // Filtro confirmado por el usuario 2026-07-22: solo Material "Mineral"
+    // (level2_value). El turno (level3_id) se filtra aparte en
+    // renderTurnoPlanKpis/renderGroupSummary via TURNO_LABEL_TO_GOALS_LEVEL3ID
+    // (1 = Turno 2 / "2da", 2 = Turno 1 / "1ra").
     // Pendiente de confirmar con datos reales: si "planning_type" === "plan"
-    // ya corresponde a "plan mediano" o si falta otro campo para ese matiz
-    // (ver .claude/knowledge-base/entities.md).
+    // ya corresponde a "plan mediano", o si el matiz de plazo (corto/mediano/
+    // largo) viene de otro campo del esquema oficial como "granularity" o
+    // "goal_type" (ver .claude/knowledge-base/entities.md).
     planLink: {
-      path: "api/v1/goals",
-      // Tambien solo Material "Mineral" (level2value), igual que el resto
+      path: "api/v1/dw_goals",
+      // Tambien solo Material "Mineral" (level2_value), igual que el resto
       // de ACARREO (pedido del usuario 2026-07-21).
-      filter: (row) => row.planning_type === "plan" && row.level2value === "Mineral",
-      lugarKey: "level1value",
+      filter: (row) => row.planning_type === "plan" && row.level2_value === "Mineral",
+      lugarKey: "level1_value",
       valueKey: "goal",
     },
   },
-  // Endpoint api/v1/goals (Plan/metas). Se mantiene documentado aqui aunque
-  // ya no cuelga de un boton propio (ver planLink arriba): sus columnas se
-  // usan para armar la comparacion Real vs Plan dentro de ACARREO.
+  // Endpoint de Plan/metas. CAMBIO 2026-07-22: "api/v1/goals" devolvia HTTP
+  // 500 consistentemente; el usuario confirmo que el dato real esta en
+  // "api/v1/dw_goals" (mismo esquema de columnas). Se mantiene documentado
+  // aqui aunque ya no cuelga de un boton propio (ver planLink arriba): sus
+  // columnas se usan para armar la comparacion Real vs Plan dentro de ACARREO.
   goals_report: {
-    path: "api/v1/goals",
+    path: "api/v1/dw_goals",
     columns: [
       { key: "datetime_end", label: "Fecha" },
       {
-        key: "level3id",
+        key: "level3_id",
         label: "Turno",
         // Confirmado por el usuario 2026-07-16: en esta tabla 1=Noche, 2=Dia
         // (numeracion propia de goals, distinta del texto "Turno 1/Turno 2"
-        // de transport_report).
+        // de transport_report). El esquema oficial tambien trae "level3_value"
+        // (posible texto legible del turno) que aun no se ha visto con datos
+        // reales -- si aparece, podria reemplazar esta conversion por ID.
         format: (v) => (String(v) === "1" ? "Noche" : String(v) === "2" ? "Dia" : v),
       },
-      { key: "level1value", label: "Lugar" },
-      { key: "level2value", label: "Material" },
+      { key: "level1_value", label: "Lugar" },
+      { key: "level2_value", label: "Material" },
       { key: "planning_type", label: "Tipo plan" },
       { key: "goal", label: "Meta" },
     ],
@@ -309,8 +321,8 @@ function getPeriodRange(period) {
   return { start: toISODate(start), end: toISODate(end) };
 }
 
-// Mapa turno (transport_report) -> level3id (goals). Confirmado por el
-// usuario 2026-07-16: en la tabla goals, level3id 1 = Noche, 2 = Dia.
+// Mapa turno (transport_report) -> level3_id (goals). Confirmado por el
+// usuario 2026-07-16: en la tabla goals, level3_id 1 = Noche, 2 = Dia.
 const TURNO_LABEL_TO_GOALS_LEVEL3ID = { "Turno 1": "2", "Turno 2": "1" };
 
 /**
@@ -599,17 +611,60 @@ async function testLastUpdateTimestamp() {
     appendRawDump(tableWrap, "transport_report", [], err.message);
   }
 
-  try {
-    const goalRows = await apiFetchReport(REPORT_DEFS.goals_report.path, { last_update_timestamp: testValue });
-    summary += goalRows.length + " fila(s) en goals.";
-    appendRawDump(tableWrap, "goals (Plan)", goalRows, null);
-  } catch (err) {
-    summary += "goals fallo.";
-    appendRawDump(tableWrap, "goals (Plan)", [], err.message);
-  }
+  // Hipotesis (2026-07-22): el esquema oficial de goals tipa
+  // "last_update_timestamp" como NUMERO (0 en el ejemplo Swagger), no como
+  // texto de fecha. Es posible que goals si intente convertir ese valor a
+  // numero/fecha internamente (a diferencia de transport_report, que lo
+  // acepto como texto sin problema) y truene con 500 al recibir texto.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const epochSeconds = Math.floor(todayStart.getTime() / 1000);
+  const epochMillis = todayStart.getTime();
+  const lastUpdateAttempts = [
+    { label: "texto de fecha (" + testValue + ")", params: { last_update_timestamp: testValue } },
+    { label: "epoch segundos (" + epochSeconds + ")", params: { last_update_timestamp: epochSeconds } },
+    { label: "epoch milisegundos (" + epochMillis + ")", params: { last_update_timestamp: epochMillis } },
+  ];
+  const dataInFiParams = {};
+  dataInFiParams[getConfig().paramFechaInicio] = testValue;
+  dataInFiParams[getConfig().paramFechaFin] = testValue;
+
+  summary += " | " + (await tryParamVariants(tableWrap, REPORT_DEFS.goals_report.path, "goals (Plan)", lastUpdateAttempts));
+
+  // Pedido del usuario (2026-07-22): probar tambien "api/v1/dw_goals" (un
+  // posible endpoint alterno, no confirmado todavia) para el Plan/metas, por
+  // si "api/v1/goals" simplemente esta roto y el dato real vive en otra ruta.
+  // Se prueba primero con dataIn/dataFi (igual que transport_report desde el
+  // principio) y, si falla, con las mismas variantes de last_update_timestamp.
+  summary += " | " + (await tryParamVariants(
+    tableWrap,
+    "api/v1/dw_goals",
+    "dw_goals (Plan)",
+    [{ label: "dataIn/dataFi (" + testValue + ")", params: dataInFiParams }, ...lastUpdateAttempts]
+  ));
 
   status.hidden = true;
   kpiRow.innerHTML = "<div class=\"hint-text\">" + escapeHtml(summary) + "</div>";
+}
+
+/**
+ * Prueba una lista de variantes de parametros contra un mismo endpoint (path),
+ * deteniendose en la primera que responda sin error. Cada intento (exito o
+ * error) se vuelca en pantalla via appendRawDump, para poder comparar. No
+ * inventa el formato correcto: solo prueba lo que ya se sabe o se sospecha
+ * del esquema real, y muestra tal cual lo que la API responda.
+ */
+async function tryParamVariants(container, path, label, attempts) {
+  for (const attempt of attempts) {
+    try {
+      const rows = await apiFetchReport(path, attempt.params);
+      appendRawDump(container, label + " - " + attempt.label, rows, null);
+      return label + " con " + attempt.label + ": " + rows.length + " fila(s) OK";
+    } catch (err) {
+      appendRawDump(container, label + " - " + attempt.label, [], err.message);
+    }
+  }
+  return label + ": ninguna variante funciono";
 }
 
 /**
@@ -805,7 +860,7 @@ function renderTurnoPlanKpis(realRows, planRows, def, turnoCtx) {
   if (planLink && Array.isArray(planRows) && planRows.length) {
     const matched = planRows.filter((p) =>
       (planLink.filter ? planLink.filter(p) : true) &&
-      String(p.level3id) === level3id &&
+      String(p.level3_id) === level3id &&
       p.datetime_end === turnoCtx.date
     );
     if (matched.length) {
@@ -882,7 +937,7 @@ function renderGroupSummary(rows, def, planRows, turnoCtx) {
     let planned = planLink.filter ? planRows.filter(planLink.filter) : planRows;
     if (turnoCtx) {
       const level3id = TURNO_LABEL_TO_GOALS_LEVEL3ID[turnoCtx.turnLabel];
-      planned = planned.filter((p) => String(p.level3id) === level3id && p.datetime_end === turnoCtx.date);
+      planned = planned.filter((p) => String(p.level3_id) === level3id && p.datetime_end === turnoCtx.date);
     }
     for (const p of planned) {
       const lugar = p[planLink.lugarKey] ?? "(sin valor)";
