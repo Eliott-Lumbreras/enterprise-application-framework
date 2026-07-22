@@ -536,63 +536,80 @@ async function openDetail(btn) {
 }
 
 /**
- * Prueba EXPLORATORIA (2026-07-21): la API menciono un parametro alterno
- * "last_update_timestamp" como alternativa a dataIn/dataFi (visto en el
- * mensaje de error real: "dataIn e dataFi sao obrigatorios quando
- * last_update_timestamp nao for fornecido"). La idea es ver si consultando
- * por ESTE parametro (en vez de por fecha de produccion) aparecen los viajes
- * de hoy que la API todavia no refleja via dataIn/dataFi (ver el retraso de
- * sincronizacion confirmado el 2026-07-21).
+ * Vuelca en pantalla el resultado crudo de una prueba exploratoria: cuantas
+ * filas trajo, TODOS los nombres de columna reales, y el contenido completo
+ * de la primera fila (sin recortar a 8 columnas ni forzar ningun mapeo), asi
+ * se puede comparar contra el esquema ya conocido de cada reporte.
+ */
+function appendRawDump(container, label, rows, errorMessage) {
+  let html = "<h3 class=\"group-summary-title\">" + escapeHtml(label) + "</h3>";
+  if (errorMessage) {
+    html += "<p class=\"error-text\">" + escapeHtml(errorMessage) + "</p>";
+  } else if (rows.length) {
+    const keys = Object.keys(rows[0]);
+    html +=
+      "<p class=\"hint-text\">" + rows.length + " fila(s). Columnas (" + keys.length + "): " +
+      escapeHtml(keys.join(", ")) + "</p>" +
+      "<pre style=\"white-space:pre-wrap;font-size:11px;background:var(--card);border:1px solid #253253;border-radius:10px;padding:10px;\">" +
+      escapeHtml(JSON.stringify(rows[0], null, 2)) + "</pre>";
+  } else {
+    html += "<p class=\"hint-text\">0 filas.</p>";
+  }
+  container.innerHTML += html;
+}
+
+/**
+ * Prueba EXPLORATORIA (2026-07-21, ampliada 2026-07-22): la API menciono un
+ * parametro alterno "last_update_timestamp" como alternativa a dataIn/dataFi
+ * (visto en el mensaje de error real: "dataIn e dataFi sao obrigatorios
+ * quando last_update_timestamp nao for fornecido"). Para transport_report
+ * esto SI funciono: confirmo el retraso de sincronizacion de "hoy" (ver
+ * fetchTodayGapRows).
  *
- * No se conoce el formato exacto que espera este parametro: se prueba
- * primero con una fecha simple (mismo formato que dataIn/dataFi). Si la API
- * responde con un error, ese error deberia decir el formato correcto (igual
- * que paso con dataIn/dataFi originalmente) — sin inventar el formato.
+ * Ahora se prueba TAMBIEN con api/v1/goals (Plan), ya que el usuario
+ * confirmo que el Plan ya esta cargado en Fast2Mine pero dataIn/dataFi sigue
+ * devolviendo HTTP 500 para ese endpoint. La idea es ver si, igual que con
+ * transport_report, last_update_timestamp evita ese error.
  *
- * Este boton NO reemplaza a Dia/Turno/Semana/Mes: es solo para explorar, y
- * su resultado se muestra con columnas genericas (sin forzar el mapeo de
- * columnas de transport_report), para no ocultar ningun campo nuevo que la
- * API devuelva en este modo.
+ * Este boton NO reemplaza a Dia/Turno/Semana/Mes: es solo para explorar.
  */
 async function testLastUpdateTimestamp() {
   if (!currentButton || currentButton.reportKey !== "transport_report") return;
   const status = document.getElementById("detail-status");
   const kpiRow = document.getElementById("kpi-row");
+  const tableWrap = document.getElementById("detail-table-wrap");
   const rangeLabel = document.getElementById("period-range");
   document.getElementById("group-summary-wrap").innerHTML = "";
   kpiRow.innerHTML = "";
+  tableWrap.innerHTML = "";
   status.hidden = false;
   status.textContent = "Probando last_update_timestamp (exploratorio)...";
 
   const testValue = toISODate(new Date());
   rangeLabel.textContent = "PRUEBA last_update_timestamp=" + testValue + " (no reemplaza Dia/Turno/Semana/Mes)";
 
+  let summary = "";
+
   try {
     const rows = await apiFetchReport(REPORT_DEFS.transport_report.path, { last_update_timestamp: testValue });
-    status.hidden = true;
-    kpiRow.innerHTML =
-      "<div class=\"hint-text\">" + rows.length + " fila(s) devueltas con last_update_timestamp=" +
-      escapeHtml(testValue) + "</div>";
-
-    // Diagnostico completo (no la tabla generica de 8 columnas): se muestran
-    // TODOS los nombres de columna reales y el contenido completo de la
-    // primera fila, para comparar contra el esquema conocido de
-    // transport_report (calculated_mass, turn, production_date,
-    // origin_subarea) sin depender de scroll horizontal.
-    const tableWrap = document.getElementById("detail-table-wrap");
-    if (rows.length) {
-      const keys = Object.keys(rows[0]);
-      tableWrap.innerHTML =
-        "<p class=\"hint-text\">Columnas reales (" + keys.length + "): " + escapeHtml(keys.join(", ")) + "</p>" +
-        "<pre style=\"white-space:pre-wrap;font-size:11px;background:var(--card);border:1px solid #253253;border-radius:10px;padding:10px;\">" +
-        escapeHtml(JSON.stringify(rows[0], null, 2)) + "</pre>";
-    } else {
-      tableWrap.innerHTML = "<p class=\"hint-text\">0 filas.</p>";
-    }
+    summary += rows.length + " fila(s) en transport_report. ";
+    appendRawDump(tableWrap, "transport_report", rows, null);
   } catch (err) {
-    status.hidden = false;
-    status.textContent = "last_update_timestamp (exploratorio) fallo: " + err.message;
+    summary += "transport_report fallo. ";
+    appendRawDump(tableWrap, "transport_report", [], err.message);
   }
+
+  try {
+    const goalRows = await apiFetchReport(REPORT_DEFS.goals_report.path, { last_update_timestamp: testValue });
+    summary += goalRows.length + " fila(s) en goals.";
+    appendRawDump(tableWrap, "goals (Plan)", goalRows, null);
+  } catch (err) {
+    summary += "goals fallo.";
+    appendRawDump(tableWrap, "goals (Plan)", [], err.message);
+  }
+
+  status.hidden = true;
+  kpiRow.innerHTML = "<div class=\"hint-text\">" + escapeHtml(summary) + "</div>";
 }
 
 /**
