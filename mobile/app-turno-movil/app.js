@@ -309,6 +309,10 @@ function getPeriodRange(period) {
   return { start: toISODate(start), end: toISODate(end) };
 }
 
+// Mapa turno (transport_report) -> level3id (goals). Confirmado por el
+// usuario 2026-07-16: en la tabla goals, level3id 1 = Noche, 2 = Dia.
+const TURNO_LABEL_TO_GOALS_LEVEL3ID = { "Turno 1": "2", "Turno 2": "1" };
+
 /**
  * Determina el turno en curso segun la hora actual, de acuerdo a los
  * horarios confirmados por el usuario (2026-07-16):
@@ -337,6 +341,33 @@ function getCurrentTurnoContext(now = new Date()) {
     rangeStart: toISODate(shiftStart),
     rangeEnd: toISODate(shiftEnd),
   };
+}
+
+/**
+ * Ventana "productiva" para calcular Plan a la hora / Proyeccion de Turno,
+ * definida por el usuario (2026-07-22) -DISTINTA del horario completo del
+ * turno (07:00-19:00 / 19:00-07:00) que se usa para filtrar viajes-:
+ * Turno 1: 09:01 a 18:00. Turno 2: 21:01 a 06:00 del dia siguiente.
+ *
+ * Devuelve el total de minutos de la ventana y los minutos ya transcurridos
+ * al momento "now" (0 si aun no empieza, el total completo si ya termino).
+ */
+function getPlanWindowMinutes(turnoCtx, now = new Date()) {
+  const [y, m, d] = turnoCtx.date.split("-").map(Number);
+  let start, end;
+  if (turnoCtx.turnLabel === "Turno 1") {
+    start = new Date(y, m - 1, d, 9, 1, 0);
+    end = new Date(y, m - 1, d, 18, 0, 0);
+  } else {
+    start = new Date(y, m - 1, d, 21, 1, 0);
+    end = new Date(y, m - 1, d + 1, 6, 0, 0);
+  }
+  const totalMinutes = Math.round((end - start) / 60000);
+  let elapsedMinutes;
+  if (now <= start) elapsedMinutes = 0;
+  else if (now >= end) elapsedMinutes = totalMinutes;
+  else elapsedMinutes = Math.round((now - start) / 60000);
+  return { start, end, totalMinutes, elapsedMinutes };
 }
 
 /**
@@ -709,13 +740,84 @@ async function loadDetail() {
       }
     }
 
-    renderKpis(rows, def);
-    renderGroupSummary(rows, def, planRows);
-    renderTable(rows, def);
+    if (isTurno && isTransport) {
+      renderTurnoPlanKpis(rows, planRows, def, turnoCtx);
+    } else {
+      renderKpis(rows, def);
+    }
+    renderGroupSummary(rows, def, planRows, isTurno ? turnoCtx : null);
+
+    // Pedido del usuario (2026-07-22): ACARREO ya no muestra el desglose de
+    // viajes individuales (tabla cruda). Se queda solo con los KPIs y el
+    // Resumen por Lugar. Otros reportes (una vez mapeados) si pueden seguir
+    // usando la tabla generica.
+    if (!isTransport) {
+      renderTable(rows, def);
+    } else {
+      document.getElementById("detail-table-wrap").innerHTML = "";
+    }
   } catch (err) {
     status.hidden = false;
     status.textContent = err.message;
   }
+}
+
+/**
+ * KPIs de Plan vs Real para el turno en curso (pedido del usuario
+ * 2026-07-22, inspirado en el reporte Power BI de referencia "Reporte de
+ * Acarreo de Mineral"): Plan Turno, Plan a la hora (Plan acumulado segun la
+ * ventana productiva de getPlanWindowMinutes), % Cumplimiento a la hora,
+ * Proyeccion de Turno (extrapolando el ritmo actual a todo el turno) y Total
+ * Realizado.
+ *
+ * "Plan Turno" se calcula sumando "goal" de las filas de Plan (goals) que
+ * coincidan con el turno actual (via TURNO_LABEL_TO_GOALS_LEVEL3ID) y la
+ * fecha del turno. Si el Plan no esta disponible (endpoint caido, sin datos
+ * para ese turno/fecha, etc.) solo se muestra el Total Realizado, sin
+ * inventar las demas tarjetas.
+ */
+function renderTurnoPlanKpis(realRows, planRows, def, turnoCtx) {
+  const kpiRow = document.getElementById("kpi-row");
+  const realTotal = realRows.reduce((sum, r) => sum + (parseFloat(r.calculated_mass) || 0), 0);
+
+  const cards = [{ label: "Total Realizado Turno", value: round2(realTotal), sub: realRows.length + " viaje(s)" }];
+
+  const planLink = def.planLink;
+  const level3id = TURNO_LABEL_TO_GOALS_LEVEL3ID[turnoCtx.turnLabel];
+  let planTurnoTotal = null;
+  if (planLink && Array.isArray(planRows) && planRows.length) {
+    const matched = planRows.filter((p) =>
+      (planLink.filter ? planLink.filter(p) : true) &&
+      String(p.level3id) === level3id &&
+      p.datetime_end === turnoCtx.date
+    );
+    if (matched.length) {
+      planTurnoTotal = matched.reduce((sum, p) => sum + (parseFloat(p[planLink.valueKey]) || 0), 0);
+    }
+  }
+
+  if (planTurnoTotal !== null && planTurnoTotal > 0) {
+    const { totalMinutes, elapsedMinutes } = getPlanWindowMinutes(turnoCtx);
+    const planAcumulado = totalMinutes > 0 ? (planTurnoTotal / totalMinutes) * elapsedMinutes : 0;
+    const pctCumpl = planAcumulado > 0 ? (realTotal / planAcumulado) * 100 : null;
+    const proyeccion = elapsedMinutes > 0 ? (realTotal / elapsedMinutes) * totalMinutes : null;
+
+    cards.push({ label: "Plan Turno", value: round2(planTurnoTotal) });
+    cards.push({ label: "Plan a la hora", value: round2(planAcumulado) });
+    cards.push({ label: "% Cumpl. a la hora", value: pctCumpl !== null ? round2(pctCumpl) + "%" : "-" });
+    cards.push({ label: "Proyeccion Turno", value: proyeccion !== null ? round2(proyeccion) : "-" });
+  } else {
+    cards.push({ label: "Plan Turno", value: "sin datos", sub: "Plan no disponible para este turno" });
+  }
+
+  kpiRow.innerHTML = cards
+    .map(
+      (c) =>
+        "<div class=\"kpi-card\"><div class=\"kpi-label\">" + escapeHtml(c.label) +
+        "</div><div class=\"kpi-value\">" + escapeHtml(c.value) +
+        "</div><div class=\"kpi-sub\">" + escapeHtml(c.sub || "") + "</div></div>"
+    )
+    .join("");
 }
 
 /**
@@ -729,8 +831,12 @@ async function loadDetail() {
  * real de cada grupo (Lugar) contra la meta de Plan para ese mismo Lugar. Si
  * planRows no esta disponible (endpoint de Plan caido, sin datos, etc.), la
  * tabla se ve exactamente igual que antes: sin inventar columnas de plan.
+ *
+ * Si se pasa "turnoCtx" (solo aplica en el periodo Turno), la Meta de cada
+ * Lugar se acota ademas al turno y fecha actuales (via
+ * TURNO_LABEL_TO_GOALS_LEVEL3ID), para no mezclar el plan de ambos turnos.
  */
-function renderGroupSummary(rows, def, planRows) {
+function renderGroupSummary(rows, def, planRows, turnoCtx) {
   const wrap = document.getElementById("group-summary-wrap");
   if (!def.groupBy) {
     wrap.innerHTML = "";
@@ -756,7 +862,11 @@ function renderGroupSummary(rows, def, planRows) {
   const planLink = def.planLink;
   const planMap = new Map();
   if (planLink && Array.isArray(planRows) && planRows.length) {
-    const planned = planLink.filter ? planRows.filter(planLink.filter) : planRows;
+    let planned = planLink.filter ? planRows.filter(planLink.filter) : planRows;
+    if (turnoCtx) {
+      const level3id = TURNO_LABEL_TO_GOALS_LEVEL3ID[turnoCtx.turnLabel];
+      planned = planned.filter((p) => String(p.level3id) === level3id && p.datetime_end === turnoCtx.date);
+    }
     for (const p of planned) {
       const lugar = p[planLink.lugarKey] ?? "(sin valor)";
       const goal = parseFloat(p[planLink.valueKey]);
