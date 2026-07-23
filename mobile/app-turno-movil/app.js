@@ -72,15 +72,15 @@ const REPORT_DEFS = {
     // (level2_value). El turno (level3_id) se filtra aparte en
     // renderTurnoPlanKpis/renderGroupSummary via TURNO_LABEL_TO_GOALS_LEVEL3ID
     // (1 = Turno 2 / "2da", 2 = Turno 1 / "1ra").
-    // Pendiente de confirmar con datos reales: si "planning_type" === "plan"
-    // ya corresponde a "plan mediano", o si el matiz de plazo (corto/mediano/
-    // largo) viene de otro campo del esquema oficial como "granularity" o
-    // "goal_type" (ver .claude/knowledge-base/entities.md).
+    // "planning_type" CORREGIDO 2026-07-23: el usuario compartio una fila real
+    // (extraida previamente, no en vivo) donde planning_type = "Médio"
+    // (Mediano en portugues) -- NO "plan" como se habia asumido antes. Ese
+    // era el matiz de "plan mediano" que llevaba dias pendiente de confirmar.
     planLink: {
       path: "api/v1/goals",
       // Tambien solo Material "Mineral" (level2_value), igual que el resto
       // de ACARREO (pedido del usuario 2026-07-21).
-      filter: (row) => row.planning_type === "plan" && row.level2_value === "Mineral",
+      filter: (row) => row.planning_type === "Médio" && row.level2_value === "Mineral",
       lugarKey: "level1_value",
       valueKey: "goal",
     },
