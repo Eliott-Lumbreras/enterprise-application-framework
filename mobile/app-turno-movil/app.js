@@ -58,14 +58,16 @@ const REPORT_DEFS = {
     ],
     // "Lugar" = origin_subarea (confirmado por el usuario 2026-07-15).
     groupBy: { key: "origin_subarea", label: "Lugar", valueKey: "calculated_mass" },
-    // Ligado a api/v1/dw_goals (Plan) para comparar Real vs Plan por Lugar,
+    // Ligado a api/v1/goals (Plan) para comparar Real vs Plan por Lugar,
     // segun el reporte Power BI de referencia ("Reporte de Acarreo de
-    // Mineral"). CAMBIO 2026-07-22: se cambio de "api/v1/goals" (que
-    // consistentemente devolvia HTTP 500 con cualquier parametro probado) a
-    // "api/v1/dw_goals" (endpoint alterno indicado por el usuario, con el
-    // mismo esquema de campos). NO es un boton/reporte propio: se trae de
-    // forma "best-effort" al cargar ACARREO y si falla simplemente no se
-    // muestra la comparacion, sin romper el resto de la pantalla.
+    // Mineral"). INTENTO 2026-07-22: se probo cambiar a "api/v1/dw_goals"
+    // (sugerido como endpoint alterno), pero esa ruta responde HTTP 404 (no
+    // existe) -- se revirtio a "api/v1/goals", que es la ruta real
+    // confirmada, aunque siga devolviendo HTTP 500 (pendiente de escalar con
+    // quien administra la API; ver conversacion 2026-07-22). NO es un
+    // boton/reporte propio: se trae de forma "best-effort" al cargar ACARREO
+    // y si falla simplemente no se muestra la comparacion, sin romper el
+    // resto de la pantalla.
     // Filtro confirmado por el usuario 2026-07-22: solo Material "Mineral"
     // (level2_value). El turno (level3_id) se filtra aparte en
     // renderTurnoPlanKpis/renderGroupSummary via TURNO_LABEL_TO_GOALS_LEVEL3ID
@@ -75,7 +77,7 @@ const REPORT_DEFS = {
     // largo) viene de otro campo del esquema oficial como "granularity" o
     // "goal_type" (ver .claude/knowledge-base/entities.md).
     planLink: {
-      path: "api/v1/dw_goals",
+      path: "api/v1/goals",
       // Tambien solo Material "Mineral" (level2_value), igual que el resto
       // de ACARREO (pedido del usuario 2026-07-21).
       filter: (row) => row.planning_type === "plan" && row.level2_value === "Mineral",
@@ -83,13 +85,14 @@ const REPORT_DEFS = {
       valueKey: "goal",
     },
   },
-  // Endpoint de Plan/metas. CAMBIO 2026-07-22: "api/v1/goals" devolvia HTTP
-  // 500 consistentemente; el usuario confirmo que el dato real esta en
-  // "api/v1/dw_goals" (mismo esquema de columnas). Se mantiene documentado
-  // aqui aunque ya no cuelga de un boton propio (ver planLink arriba): sus
-  // columnas se usan para armar la comparacion Real vs Plan dentro de ACARREO.
+  // Endpoint de Plan/metas. "api/v1/dw_goals" (sugerido 2026-07-22 como
+  // alterno) NO existe (HTTP 404): se confirmo que la ruta real es
+  // "api/v1/goals", que sigue devolviendo HTTP 500 (bug del lado del
+  // servidor, pendiente de escalar). Se mantiene documentado aqui aunque ya
+  // no cuelga de un boton propio (ver planLink arriba): sus columnas se
+  // usan para armar la comparacion Real vs Plan dentro de ACARREO.
   goals_report: {
-    path: "api/v1/dw_goals",
+    path: "api/v1/goals",
     columns: [
       { key: "datetime_end", label: "Fecha" },
       {
@@ -625,23 +628,11 @@ async function testLastUpdateTimestamp() {
     { label: "epoch segundos (" + epochSeconds + ")", params: { last_update_timestamp: epochSeconds } },
     { label: "epoch milisegundos (" + epochMillis + ")", params: { last_update_timestamp: epochMillis } },
   ];
-  const dataInFiParams = {};
-  dataInFiParams[getConfig().paramFechaInicio] = testValue;
-  dataInFiParams[getConfig().paramFechaFin] = testValue;
-
+  // Nota 2026-07-22: se probo tambien "api/v1/dw_goals" como posible ruta
+  // alterna -- confirmado que NO existe (HTTP 404), asi que ya no se incluye
+  // aqui. La unica ruta real de Plan/metas es "api/v1/goals" (con su HTTP
+  // 500 pendiente de escalar).
   summary += " | " + (await tryParamVariants(tableWrap, REPORT_DEFS.goals_report.path, "goals (Plan)", lastUpdateAttempts));
-
-  // Pedido del usuario (2026-07-22): probar tambien "api/v1/dw_goals" (un
-  // posible endpoint alterno, no confirmado todavia) para el Plan/metas, por
-  // si "api/v1/goals" simplemente esta roto y el dato real vive en otra ruta.
-  // Se prueba primero con dataIn/dataFi (igual que transport_report desde el
-  // principio) y, si falla, con las mismas variantes de last_update_timestamp.
-  summary += " | " + (await tryParamVariants(
-    tableWrap,
-    "api/v1/dw_goals",
-    "dw_goals (Plan)",
-    [{ label: "dataIn/dataFi (" + testValue + ")", params: dataInFiParams }, ...lastUpdateAttempts]
-  ));
 
   status.hidden = true;
   kpiRow.innerHTML = "<div class=\"hint-text\">" + escapeHtml(summary) + "</div>";
